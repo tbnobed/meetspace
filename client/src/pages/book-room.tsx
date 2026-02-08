@@ -275,47 +275,91 @@ export default function BookRoom() {
                   </CardContent>
                 </Card>
               )}
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <DoorOpen className="w-4 h-4" />
-                    Select Room
+                    <CalendarIcon className="w-4 h-4" />
+                    Date & Time
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="mb-4">
-                    <Select value={selectedFacility} onValueChange={setSelectedFacility}>
-                      <SelectTrigger data-testid="select-facility-filter">
-                        <Building2 className="w-4 h-4 mr-2" />
-                        <SelectValue placeholder="Filter by facility" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Facilities</SelectItem>
-                        {facilities?.map((f) => (
-                          <SelectItem key={f.id} value={f.id}>
-                            {f.name} ({getTimezoneAbbr(f.timezone)})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <CardContent className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="roomId"
+                    name="date"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <RoomSelector
-                            rooms={rooms || []}
-                            value={field.value}
-                            onChange={field.onChange}
-                            facilityId={selectedFacility !== "all" ? selectedFacility : undefined}
-                          />
-                        </FormControl>
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button variant="outline" className="justify-start text-left font-normal" data-testid="button-date-picker">
+                                <CalendarIcon className="mr-2 w-4 h-4" />
+                                {field.value ? format(field.value, "PPP") : "Pick a date"}
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                            />
+                          </PopoverContent>
+                        </Popover>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="startTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Start Time</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-start-time">
+                                <Clock className="w-4 h-4 mr-2" />
+                                <SelectValue placeholder="Select start time" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {timeSlots.map((slot) => (
+                                <SelectItem key={slot.value} value={slot.value}>{slot.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="endTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>End Time</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-end-time">
+                                <Clock className="w-4 h-4 mr-2" />
+                                <SelectValue placeholder="Select end time" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {timeSlots.map((slot) => (
+                                <SelectItem key={slot.value} value={slot.value}>{slot.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </CardContent>
               </Card>
 
@@ -383,91 +427,6 @@ export default function BookRoom() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <CalendarIcon className="w-4 h-4" />
-                    Date & Time
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="date"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Date</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button variant="outline" className="justify-start text-left font-normal" data-testid="button-date-picker">
-                                <CalendarIcon className="mr-2 w-4 h-4" />
-                                {field.value ? format(field.value, "PPP") : "Pick a date"}
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="startTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Start Time</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-start-time">
-                              <Clock className="w-4 h-4 mr-2" />
-                              <SelectValue placeholder="Select start time" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {timeSlots.map((slot) => (
-                              <SelectItem key={slot.value} value={slot.value}>{slot.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="endTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>End Time</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-end-time">
-                              <Clock className="w-4 h-4 mr-2" />
-                              <SelectValue placeholder="Select end time" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {timeSlots.map((slot) => (
-                              <SelectItem key={slot.value} value={slot.value}>{slot.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
                     <Video className="w-4 h-4" />
                     Virtual Meeting
                   </CardTitle>
@@ -491,6 +450,50 @@ export default function BookRoom() {
                             <SelectItem value="zoom">Zoom</SelectItem>
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <DoorOpen className="w-4 h-4" />
+                    Select Room
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <Select value={selectedFacility} onValueChange={setSelectedFacility}>
+                      <SelectTrigger data-testid="select-facility-filter">
+                        <Building2 className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Filter by facility" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Facilities</SelectItem>
+                        {facilities?.map((f) => (
+                          <SelectItem key={f.id} value={f.id}>
+                            {f.name} ({getTimezoneAbbr(f.timezone)})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="roomId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <RoomSelector
+                            rooms={rooms || []}
+                            value={field.value}
+                            onChange={field.onChange}
+                            facilityId={selectedFacility !== "all" ? selectedFacility : undefined}
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
