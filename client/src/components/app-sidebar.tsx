@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, CalendarPlus, CalendarDays, DoorOpen, Building2, Users, ClipboardList, Settings } from "lucide-react";
+import { LayoutDashboard, CalendarPlus, CalendarDays, DoorOpen, Building2, Users, ClipboardList, Settings, LogOut } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +13,8 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth";
 
 const mainNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -30,6 +32,8 @@ const adminNav = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   return (
     <Sidebar>
@@ -62,31 +66,54 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            <span className="flex items-center gap-2">
-              Administration
-              <Badge variant="secondary" className="text-[10px]">Admin</Badge>
-            </span>
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url || location.startsWith(item.url + "/")}>
-                    <Link href={item.url} data-testid={`nav-admin-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
-                      <item.icon className="w-4 h-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>
+              <span className="flex items-center gap-2">
+                Administration
+                <Badge variant="secondary" className="text-[10px]">Admin</Badge>
+              </span>
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminNav.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={location === item.url || location.startsWith(item.url + "/")}>
+                      <Link href={item.url} data-testid={`nav-admin-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter className="p-4">
-        <div className="text-xs text-muted-foreground">
+        {user && (
+          <div className="space-y-3">
+            <div className="text-xs">
+              <p className="font-medium truncate" data-testid="text-user-name">{user.displayName}</p>
+              <p className="text-muted-foreground truncate">{user.email}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={async () => {
+                await logout();
+                window.location.href = "/auth";
+              }}
+              data-testid="button-logout"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
+        )}
+        <div className="text-xs text-muted-foreground mt-2">
           MeetSpace Manager v1.0
         </div>
       </SidebarFooter>

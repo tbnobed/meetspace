@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth";
 import { getTimezoneAbbr } from "@/lib/constants";
 import { format } from "date-fns";
 import {
@@ -27,6 +28,7 @@ import {
   Building2,
   Monitor,
   Video,
+  LogIn,
 } from "lucide-react";
 import type { Facility, RoomWithFacility } from "@shared/schema";
 
@@ -39,6 +41,8 @@ const bookingFormSchema = z.object({
   endTime: z.string().min(1, "End time is required"),
   meetingType: z.string().default("none"),
   attendees: z.string().optional(),
+  guestName: z.string().optional(),
+  guestEmail: z.string().optional(),
 });
 
 type BookingFormValues = z.infer<typeof bookingFormSchema>;
@@ -106,7 +110,10 @@ export default function BookRoom() {
   const params = new URLSearchParams(searchString);
   const preselectedRoom = params.get("room") || "";
   const [selectedFacility, setSelectedFacility] = useState<string>("all");
+  const [bookingComplete, setBookingComplete] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isGuest = !user;
 
   const { data: facilities } = useQuery<Facility[]>({ queryKey: ["/api/facilities"] });
   const { data: rooms, isLoading } = useQuery<RoomWithFacility[]>({ queryKey: ["/api/rooms"] });
@@ -122,11 +129,17 @@ export default function BookRoom() {
       endTime: "",
       meetingType: "none",
       attendees: "",
+      guestName: "",
+      guestEmail: "",
     },
   });
 
   const createBooking = useMutation({
     mutationFn: async (values: BookingFormValues) => {
+      if (isGuest && (!values.guestName || !values.guestEmail)) {
+        throw new Error("Name and email are required for guest bookings");
+      }
+
       const dateStr = format(values.date, "yyyy-MM-dd");
       const startTime = new Date(`${dateStr}T${values.startTime}:00`);
       const endTime = new Date(`${dateStr}T${values.endTime}:00`);
@@ -134,7 +147,7 @@ export default function BookRoom() {
         ? values.attendees.split(",").map((a) => a.trim()).filter(Boolean)
         : [];
 
-      const res = await apiRequest("POST", "/api/bookings", {
+      const body: Record<string, any> = {
         roomId: values.roomId,
         title: values.title,
         description: values.description || undefined,
@@ -143,14 +156,25 @@ export default function BookRoom() {
         meetingType: values.meetingType,
         attendees: attendeesArr.length > 0 ? attendeesArr : undefined,
         isRecurring: false,
-      });
+      };
+
+      if (isGuest) {
+        body.guestName = values.guestName;
+        body.guestEmail = values.guestEmail;
+      }
+
+      const res = await apiRequest("POST", "/api/bookings", body);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bookings/today"] });
       toast({ title: "Room booked successfully", description: "Your meeting has been scheduled." });
-      navigate("/bookings");
+      if (isGuest) {
+        setBookingComplete(true);
+      } else {
+        navigate("/bookings");
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Booking failed", description: error.message, variant: "destructive" });
@@ -168,17 +192,89 @@ export default function BookRoom() {
     );
   }
 
-  return (
+  if (bookingComplete) {
+    return (
+      <div className={isGuest ? "min-h-screen bg-background p-6 max-w-3xl mx-auto" : ""}>
+        <Card className="max-w-md mx-auto mt-12">
+          <CardContent className="pt-6 text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+              <CalendarIcon className="w-8 h-8 text-primary" />
+            </div>
+            <h2 className="text-xl font-semibold">Booking Confirmed</h2>
+            <p className="text-muted-foreground text-sm">Your room has been successfully booked.</p>
+            <div className="flex flex-col gap-2">
+              <Button onClick={() => { setBookingComplete(false); form.reset(); }} data-testid="button-book-another">
+                Book Another Room
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/auth")} data-testid="button-sign-in">
+                <LogIn className="w-4 h-4 mr-2" />
+                Sign in to manage bookings
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const content = (
     <div>
       <PageHeader
         title="Book a Room"
-        description="Select a room and schedule your meeting"
+        description={isGuest ? "Book a conference room — no account required" : "Select a room and schedule your meeting"}
       />
+      {isGuest && (
+        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+          <span>Already have an account?</span>
+          <Button variant="outline" size="sm" onClick={() => navigate("/auth")} data-testid="button-goto-login">
+            <LogIn className="w-4 h-4 mr-2" />
+            Sign In
+          </Button>
+        </div>
+      )}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit((v) => createBooking.mutate(v))} className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
+              {isGuest && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Your Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="guestName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Full Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Your full name" {...field} data-testid="input-guest-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="guestEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="you@company.com" {...field} data-testid="input-guest-email" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+              )}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
@@ -416,4 +512,14 @@ export default function BookRoom() {
       </Form>
     </div>
   );
+
+  if (isGuest) {
+    return (
+      <div className="min-h-screen bg-background p-6 max-w-7xl mx-auto">
+        {content}
+      </div>
+    );
+  }
+
+  return content;
 }
