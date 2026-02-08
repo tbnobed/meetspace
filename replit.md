@@ -20,13 +20,13 @@ Conference room management system for a multi-facility organization with ~20 con
 
 ## Key Pages
 - `/auth` - Login and registration page
-- `/` - Dashboard with real-time room availability (requires auth)
-- `/calendar` - Calendar view with day, week, and month modes (requires auth)
+- `/` - Dashboard with stat cards and calendar view (day/week/month modes) (requires auth)
+- `/meetings` - All Meetings with real-time room availability cards by facility (requires auth)
 - `/book` - Book a conference room (public, supports guest booking)
 - `/bookings` - View and manage personal bookings (requires auth)
 - `/admin/rooms` - Room CRUD management (admin only)
 - `/admin/facilities` - Facility CRUD management (admin only)
-- `/admin/users` - User listing (admin only)
+- `/admin/users` - User CRUD management (admin only)
 - `/admin/audit` - Audit log viewer (admin only)
 
 ## Data Model

@@ -17,7 +17,7 @@ import AdminRooms from "@/pages/admin/rooms";
 import AdminFacilities from "@/pages/admin/facilities";
 import AdminUsers from "@/pages/admin/users";
 import AdminAuditLog from "@/pages/admin/audit-log";
-import CalendarView from "@/pages/calendar";
+import AllMeetings from "@/pages/all-meetings";
 import AuthPage from "@/pages/auth";
 import NotFound from "@/pages/not-found";
 
@@ -67,7 +67,7 @@ function AuthenticatedLayout() {
             <main className="p-6 max-w-7xl mx-auto w-full">
               <Switch>
                 <Route path="/">{() => <ProtectedRoute component={Dashboard} />}</Route>
-                <Route path="/calendar">{() => <ProtectedRoute component={CalendarView} />}</Route>
+                <Route path="/meetings">{() => <ProtectedRoute component={AllMeetings} />}</Route>
                 <Route path="/book" component={BookRoom} />
                 <Route path="/bookings">{() => <ProtectedRoute component={MyBookings} />}</Route>
                 <Route path="/admin/rooms">{() => <AdminRoute component={AdminRooms} />}</Route>
