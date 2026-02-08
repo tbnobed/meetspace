@@ -60,6 +60,23 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  if (process.env.NODE_ENV !== "production") {
+    const { execSync } = await import("child_process");
+    try {
+      execSync("npm run db:push --force", { stdio: "inherit" });
+      log("Database schema pushed successfully", "db");
+    } catch (e) {
+      console.error("Failed to push database schema:", e);
+    }
+  }
+
+  const { seedDatabase } = await import("./seed");
+  try {
+    await seedDatabase();
+  } catch (e) {
+    console.error("Failed to seed database:", e);
+  }
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
