@@ -68,6 +68,7 @@ function AuthenticatedLayout() {
               <Switch>
                 <Route path="/">{() => <ProtectedRoute component={Dashboard} />}</Route>
                 <Route path="/calendar">{() => <ProtectedRoute component={CalendarView} />}</Route>
+                <Route path="/book" component={BookRoom} />
                 <Route path="/bookings">{() => <ProtectedRoute component={MyBookings} />}</Route>
                 <Route path="/admin/rooms">{() => <AdminRoute component={AdminRooms} />}</Route>
                 <Route path="/admin/facilities">{() => <AdminRoute component={AdminFacilities} />}</Route>
@@ -83,11 +84,18 @@ function AuthenticatedLayout() {
   );
 }
 
+function GuestBookPage() {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <div className="flex items-center justify-center h-screen"><Skeleton className="h-12 w-48" /></div>;
+  if (user) return <AuthenticatedLayout />;
+  return <BookRoom />;
+}
+
 function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
-      <Route path="/book" component={BookRoom} />
+      <Route path="/book" component={GuestBookPage} />
       <Route>{() => <AuthenticatedLayout />}</Route>
     </Switch>
   );
