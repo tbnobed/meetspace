@@ -38,6 +38,7 @@ export const users = pgTable("users", {
   email: text("email").notNull(),
   role: userRoleEnum("role").notNull().default("user"),
   facilityId: varchar("facility_id").references(() => facilities.id),
+  approved: boolean("approved").notNull().default(false),
 });
 
 export const userFacilityAssignments = pgTable("user_facility_assignments", {

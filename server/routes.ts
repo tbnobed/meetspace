@@ -42,6 +42,9 @@ export async function registerRoutes(
     if (!valid) {
       return res.status(401).json({ message: "Invalid username or password" });
     }
+    if (!user.approved) {
+      return res.status(403).json({ message: "Your account is pending approval. An administrator will review your registration shortly." });
+    }
     req.session.userId = user.id;
     const { password: _, ...safeUser } = user;
     res.json(safeUser);
@@ -71,10 +74,10 @@ export async function registerRoutes(
       email: parsed.data.email,
       role: "user",
       facilityId: parsed.data.facilityId || null,
+      approved: false,
     });
-    req.session.userId = user.id;
     const { password: _, ...safeUser } = user;
-    res.status(201).json(safeUser);
+    res.status(201).json({ ...safeUser, pendingApproval: true });
   });
 
   app.post("/api/auth/logout", (req, res) => {
@@ -141,6 +144,7 @@ export async function registerRoutes(
           email: guestEmail,
           role: "user",
           facilityId: null,
+          approved: true,
         });
       }
       userId = guestUser.id;
@@ -368,6 +372,7 @@ export async function registerRoutes(
       const user = await storage.createUser({
         ...userData,
         password: hashed,
+        approved: true,
       });
 
       if (parsed.data.role === "site_admin" && assignedFacilityIds && assignedFacilityIds.length > 0) {
@@ -401,6 +406,7 @@ export async function registerRoutes(
         role: z.enum(["admin", "user", "site_admin"]).optional(),
         facilityId: z.string().nullable().optional(),
         password: z.string().min(6).optional(),
+        approved: z.boolean().optional(),
         assignedFacilityIds: z.array(z.string()).optional(),
       });
       const parsed = schema.safeParse(req.body);

@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { Building2, LogIn, UserPlus } from "lucide-react";
+import { Building2, LogIn, UserPlus, Clock } from "lucide-react";
 import type { Facility } from "@shared/schema";
 
 const loginSchema = z.object({
@@ -33,6 +33,7 @@ type RegisterValues = z.infer<typeof registerSchema>;
 
 export default function AuthPage() {
   const [tab, setTab] = useState<string>("login");
+  const [registrationPending, setRegistrationPending] = useState(false);
   const { user, login, register } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,7 +60,11 @@ export default function AuthPage() {
       await login(values.username, values.password);
       toast({ title: "Welcome back", description: "You have been logged in." });
     } catch (error: any) {
-      toast({ title: "Login failed", description: error.message?.includes("401") ? "Invalid username or password" : error.message, variant: "destructive" });
+      if (error.message?.includes("403")) {
+        toast({ title: "Account pending approval", description: "Your account is pending approval. An administrator will review your registration shortly.", variant: "destructive" });
+      } else {
+        toast({ title: "Login failed", description: error.message?.includes("401") ? "Invalid username or password" : error.message, variant: "destructive" });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -75,13 +80,54 @@ export default function AuthPage() {
         email: values.email,
         facilityId: values.facilityId || undefined,
       });
-      toast({ title: "Account created", description: "Welcome to MeetSpace Manager!" });
+      setRegistrationPending(true);
     } catch (error: any) {
       toast({ title: "Registration failed", description: error.message?.includes("409") ? "Username already taken" : error.message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (registrationPending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md">
+          <div className="flex items-center justify-center gap-3 mb-8">
+            <div className="flex items-center justify-center w-12 h-12 rounded-md bg-primary">
+              <Building2 className="w-7 h-7 text-primary-foreground" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xl font-semibold tracking-tight">MeetSpace</span>
+              <span className="text-sm text-muted-foreground">Room Manager</span>
+            </div>
+          </div>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center text-center py-6 space-y-4">
+                <div className="flex items-center justify-center w-14 h-14 rounded-full bg-muted">
+                  <Clock className="w-7 h-7 text-muted-foreground" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-lg font-semibold" data-testid="text-pending-title">Registration Submitted</h2>
+                  <p className="text-sm text-muted-foreground" data-testid="text-pending-message">
+                    Your account has been created and is pending approval. An administrator will review your registration and set your permissions before you can access the application.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => { setRegistrationPending(false); setTab("login"); }}
+                  data-testid="button-back-to-login"
+                >
+                  Back to Sign In
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">

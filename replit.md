@@ -16,6 +16,8 @@ Conference room management system for a multi-facility organization with ~20 con
 - `/book` page is public (guest booking with name/email)
 - All other pages require authentication
 - Admin pages require `role: "admin"`
+- **Registration approval**: New user registrations require admin approval before access is granted. Users see a "pending approval" message after registration and cannot log in until approved.
+- Admin-created users and guest booking users are auto-approved
 - Demo accounts: admin/admin123, jdoe/password, jsmith/password, lgarcia/password (site admin)
 
 ## User Roles
@@ -38,7 +40,7 @@ Conference room management system for a multi-facility organization with ~20 con
 - **Facilities**: 4 locations (Tustin/PST, Nashville/CST, Plex-Dallas/CST, Heritage-Dallas/CST)
 - **Rooms**: ~20 rooms with capacity, floor, equipment info
 - **Bookings**: Time-slot bookings with conflict detection, meeting type (Teams/Zoom/None), optional bookedForName/bookedForEmail for site admin bookings
-- **Users**: Admin, user, and site_admin roles, bcrypt-hashed passwords
+- **Users**: Admin, user, and site_admin roles, bcrypt-hashed passwords, `approved` boolean (default false for self-registration, true for admin-created/guest users)
 - **User Facility Assignments**: Junction table mapping site_admin users to their assigned facilities (many-to-many)
 - **Audit Logs**: Track all system changes
 

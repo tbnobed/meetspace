@@ -76,6 +76,7 @@ export async function seedDatabase() {
     email: "admin@meetspace.io",
     role: "admin",
     facilityId: tustin.id,
+    approved: true,
   }).returning();
 
   const [jdoe] = await db.insert(users).values({
@@ -85,6 +86,7 @@ export async function seedDatabase() {
     email: "john.doe@company.com",
     role: "user",
     facilityId: tustin.id,
+    approved: true,
   }).returning();
 
   const [jsmith] = await db.insert(users).values({
@@ -94,6 +96,7 @@ export async function seedDatabase() {
     email: "jane.smith@company.com",
     role: "user",
     facilityId: nashville.id,
+    approved: true,
   }).returning();
 
   const [mwilson] = await db.insert(users).values({
@@ -103,6 +106,7 @@ export async function seedDatabase() {
     email: "mike.wilson@company.com",
     role: "admin",
     facilityId: plex.id,
+    approved: true,
   }).returning();
 
   const [sjohnson] = await db.insert(users).values({
@@ -112,6 +116,7 @@ export async function seedDatabase() {
     email: "sarah.johnson@company.com",
     role: "user",
     facilityId: heritage.id,
+    approved: true,
   }).returning();
 
   const [receptionist] = await db.insert(users).values({
@@ -121,6 +126,7 @@ export async function seedDatabase() {
     email: "lisa.garcia@company.com",
     role: "site_admin",
     facilityId: tustin.id,
+    approved: true,
   }).returning();
 
   await db.insert(userFacilityAssignments).values([

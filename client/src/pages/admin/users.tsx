@@ -33,7 +33,7 @@ import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getTimezoneAbbr } from "@/lib/constants";
-import { Plus, Users, Shield, Building2, Pencil, Trash2, MapPin } from "lucide-react";
+import { Plus, Users, Shield, Building2, Pencil, Trash2, MapPin, CheckCircle, Clock } from "lucide-react";
 import type { User, Facility } from "@shared/schema";
 
 type UserWithFacility = User & { facility?: Facility; assignedFacilityIds?: string[] };
@@ -308,6 +308,19 @@ export default function AdminUsers() {
   const { data: users, isLoading } = useQuery<UserWithFacility[]>({ queryKey: ["/api/users"] });
   const { data: facilities } = useQuery<Facility[]>({ queryKey: ["/api/facilities"] });
 
+  const approveMutation = useMutation({
+    mutationFn: async ({ id, approved }: { id: string; approved: boolean }) => {
+      return apiRequest("PATCH", `/api/users/${id}`, { approved });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "User status updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       return apiRequest("DELETE", `/api/users/${id}`);
@@ -364,8 +377,9 @@ export default function AdminUsers() {
                   <TableHead>User</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Facility</TableHead>
-                  <TableHead className="w-20"></TableHead>
+                  <TableHead className="w-24"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -392,6 +406,30 @@ export default function AdminUsers() {
                           <span className="text-[10px] text-muted-foreground">
                             {user.assignedFacilityIds.length} site{user.assignedFacilityIds.length !== 1 ? "s" : ""}
                           </span>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {user.approved ? (
+                        <Badge variant="secondary" className="text-[10px]" data-testid={`badge-approved-${user.id}`}>
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Approved
+                        </Badge>
+                      ) : (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="text-[10px] border-yellow-500/50 text-yellow-700 dark:text-yellow-400" data-testid={`badge-pending-${user.id}`}>
+                            <Clock className="w-3 h-3 mr-1" />
+                            Pending
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => approveMutation.mutate({ id: user.id, approved: true })}
+                            disabled={approveMutation.isPending}
+                            data-testid={`button-approve-user-${user.id}`}
+                          >
+                            Approve
+                          </Button>
                         </div>
                       )}
                     </TableCell>
