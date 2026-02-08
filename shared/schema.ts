@@ -9,7 +9,7 @@ export const auditActionEnum = pgEnum("audit_action", [
   "booking_created", "booking_cancelled", "booking_modified",
   "room_created", "room_updated", "room_deleted",
   "facility_created", "facility_updated", "facility_deleted",
-  "user_created", "user_updated"
+  "user_created", "user_updated", "user_deleted"
 ]);
 
 export const facilities = pgTable("facilities", {

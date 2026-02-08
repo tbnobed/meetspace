@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertFacilitySchema, insertRoomSchema, insertBookingSchema } from "@shared/schema";
+import { insertFacilitySchema, insertRoomSchema, insertBookingSchema, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 
@@ -277,6 +277,116 @@ export async function registerRoutes(
   app.get("/api/users", requireAdmin, async (_req, res) => {
     const result = await storage.getUsers();
     res.json(result);
+  });
+
+  app.post("/api/users", requireAdmin, async (req, res) => {
+    try {
+      const schema = insertUserSchema.pick({
+        username: true,
+        displayName: true,
+        email: true,
+        role: true,
+        facilityId: true,
+      }).extend({
+        password: z.string().min(6, "Password must be at least 6 characters"),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0].message });
+      }
+      const existing = await storage.getUserByUsername(parsed.data.username);
+      if (existing) {
+        return res.status(409).json({ message: "Username already exists" });
+      }
+      const hashed = await bcrypt.hash(parsed.data.password, 10);
+      const user = await storage.createUser({
+        ...parsed.data,
+        password: hashed,
+      });
+      await storage.createAuditLog({
+        action: "user_created",
+        entityType: "user",
+        entityId: user.id,
+        userId: req.session.userId as string,
+        details: JSON.stringify({ username: user.username, displayName: user.displayName, role: user.role }),
+      });
+      const { password: _, ...safeUser } = user;
+      res.status(201).json(safeUser);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to create user" });
+    }
+  });
+
+  app.patch("/api/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = req.params.id as string;
+      const existing = await storage.getUser(id);
+      if (!existing) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const schema = z.object({
+        displayName: z.string().min(1).optional(),
+        email: z.string().email().optional(),
+        role: z.enum(["admin", "user"]).optional(),
+        facilityId: z.string().nullable().optional(),
+        password: z.string().min(6).optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0].message });
+      }
+      const updateData: Record<string, any> = { ...parsed.data };
+      if (updateData.password) {
+        updateData.password = await bcrypt.hash(updateData.password, 10);
+      } else {
+        delete updateData.password;
+      }
+      const updated = await storage.updateUser(id, updateData);
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      await storage.createAuditLog({
+        action: "user_updated",
+        entityType: "user",
+        entityId: id,
+        userId: req.session.userId as string,
+        details: JSON.stringify({ displayName: updated.displayName, role: updated.role }),
+      });
+      const { password: _, ...safeUser } = updated;
+      res.json(safeUser);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = req.params.id as string;
+      if (id === req.session.userId) {
+        return res.status(400).json({ message: "You cannot delete your own account" });
+      }
+      const existing = await storage.getUser(id);
+      if (!existing) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const deleted = await storage.deleteUser(id);
+      if (!deleted) {
+        return res.status(500).json({ message: "Failed to delete user" });
+      }
+      await storage.createAuditLog({
+        action: "user_deleted",
+        entityType: "user",
+        entityId: id,
+        userId: req.session.userId as string,
+        details: JSON.stringify({ username: existing.username, displayName: existing.displayName }),
+      });
+      res.json({ message: "User deleted" });
+    } catch (error: any) {
+      if (error.message?.includes("foreign key")) {
+        return res.status(409).json({ message: "Cannot delete user with existing bookings. Cancel their bookings first." });
+      }
+      res.status(500).json({ message: error.message || "Failed to delete user" });
+    }
   });
 
   app.get("/api/audit-logs", requireAdmin, async (_req, res) => {
