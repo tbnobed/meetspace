@@ -1,12 +1,13 @@
-import { eq, and, gte, lte, or, desc, ne } from "drizzle-orm";
+import { eq, and, gte, lte, or, desc, ne, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
-  facilities, rooms, users, bookings, auditLogs,
+  facilities, rooms, users, bookings, auditLogs, userFacilityAssignments,
   type Facility, type InsertFacility,
   type Room, type InsertRoom,
   type User, type InsertUser,
   type Booking, type InsertBooking,
   type AuditLog, type InsertAuditLog,
+  type UserFacilityAssignment, type InsertUserFacilityAssignment,
   type RoomWithFacility, type BookingWithDetails,
 } from "@shared/schema";
 
@@ -31,6 +32,10 @@ export interface IStorage {
   createUser(data: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
+
+  // User Facility Assignments
+  getUserFacilityAssignments(userId: string): Promise<UserFacilityAssignment[]>;
+  setUserFacilityAssignments(userId: string, facilityIds: string[]): Promise<UserFacilityAssignment[]>;
 
   // Bookings
   getBookings(): Promise<BookingWithDetails[]>;
@@ -138,6 +143,18 @@ export class DatabaseStorage implements IStorage {
   async deleteUser(id: string): Promise<boolean> {
     const result = await db.delete(users).where(eq(users.id, id)).returning();
     return result.length > 0;
+  }
+
+  // User Facility Assignments
+  async getUserFacilityAssignments(userId: string): Promise<UserFacilityAssignment[]> {
+    return db.select().from(userFacilityAssignments).where(eq(userFacilityAssignments.userId, userId));
+  }
+
+  async setUserFacilityAssignments(userId: string, facilityIds: string[]): Promise<UserFacilityAssignment[]> {
+    await db.delete(userFacilityAssignments).where(eq(userFacilityAssignments.userId, userId));
+    if (facilityIds.length === 0) return [];
+    const values = facilityIds.map((facilityId) => ({ userId, facilityId }));
+    return db.insert(userFacilityAssignments).values(values).returning();
   }
 
   // Bookings

@@ -94,6 +94,12 @@ export async function registerRoutes(
       return res.status(401).json({ message: "User not found" });
     }
     const { password: _, ...safeUser } = user;
+
+    if (user.role === "site_admin") {
+      const assignments = await storage.getUserFacilityAssignments(user.id);
+      return res.json({ ...safeUser, assignedFacilityIds: assignments.map((a) => a.facilityId) });
+    }
+
     res.json(safeUser);
   });
 
@@ -114,9 +120,11 @@ export async function registerRoutes(
     res.json(room);
   });
 
-  // Public booking endpoint - supports both authenticated and guest bookings
+  // Public booking endpoint - supports authenticated, site_admin, and guest bookings
   app.post("/api/bookings", async (req, res) => {
     let userId = req.session.userId;
+    let bookedForName: string | null = null;
+    let bookedForEmail: string | null = null;
 
     if (!userId) {
       const { guestName, guestEmail } = req.body;
@@ -136,11 +144,30 @@ export async function registerRoutes(
         });
       }
       userId = guestUser.id;
+    } else {
+      const currentUser = await storage.getUser(userId);
+      if (currentUser && currentUser.role === "site_admin") {
+        const room = await storage.getRoom(req.body.roomId);
+        if (room) {
+          const assignments = await storage.getUserFacilityAssignments(userId);
+          const assignedFacilityIds = assignments.map((a) => a.facilityId);
+          if (assignedFacilityIds.length > 0 && !assignedFacilityIds.includes(room.facilityId)) {
+            return res.status(403).json({ message: "You are not assigned to this facility" });
+          }
+        }
+
+        if (req.body.bookedForName && req.body.bookedForEmail) {
+          bookedForName = req.body.bookedForName;
+          bookedForEmail = req.body.bookedForEmail;
+        }
+      }
     }
 
     const bodyWithUser = {
       ...req.body,
       userId,
+      bookedForName,
+      bookedForEmail,
     };
 
     const parsed = insertBookingSchema.safeParse(bodyWithUser);
@@ -161,12 +188,15 @@ export async function registerRoutes(
     }
 
     const booking = await storage.createBooking(parsed.data);
+    const details = bookedForName
+      ? `Booked "${booking.title}" in room ${parsed.data.roomId} on behalf of ${bookedForName}`
+      : `Booked "${booking.title}" in room ${parsed.data.roomId}`;
     await storage.createAuditLog({
       userId,
       action: "booking_created",
       entityType: "booking",
       entityId: booking.id,
-      details: `Booked "${booking.title}" in room ${parsed.data.roomId}`,
+      details,
     });
     res.status(201).json(booking);
   });
@@ -213,6 +243,31 @@ export async function registerRoutes(
       details: `Cancelled booking: ${booking.title}`,
     });
     res.json(booking);
+  });
+
+  // ── User Facility Assignments ──
+  app.get("/api/users/:id/facility-assignments", requireAdmin, async (req, res) => {
+    const assignments = await storage.getUserFacilityAssignments(req.params.id as string);
+    res.json(assignments);
+  });
+
+  app.put("/api/users/:id/facility-assignments", requireAdmin, async (req, res) => {
+    const schema = z.object({
+      facilityIds: z.array(z.string()),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "facilityIds array is required" });
+    }
+    const assignments = await storage.setUserFacilityAssignments(req.params.id as string, parsed.data.facilityIds);
+    await storage.createAuditLog({
+      userId: req.session.userId as string,
+      action: "user_updated",
+      entityType: "user",
+      entityId: req.params.id as string,
+      details: JSON.stringify({ action: "facility_assignments_updated", facilityIds: parsed.data.facilityIds }),
+    });
+    res.json(assignments);
   });
 
   // ── Admin Routes ──
@@ -275,8 +330,17 @@ export async function registerRoutes(
   });
 
   app.get("/api/users", requireAdmin, async (_req, res) => {
-    const result = await storage.getUsers();
-    res.json(result);
+    const allUsers = await storage.getUsers();
+    const usersWithAssignments = await Promise.all(
+      allUsers.map(async (user) => {
+        if (user.role === "site_admin") {
+          const assignments = await storage.getUserFacilityAssignments(user.id);
+          return { ...user, assignedFacilityIds: assignments.map((a) => a.facilityId) };
+        }
+        return { ...user, assignedFacilityIds: [] as string[] };
+      })
+    );
+    res.json(usersWithAssignments);
   });
 
   app.post("/api/users", requireAdmin, async (req, res) => {
@@ -289,6 +353,7 @@ export async function registerRoutes(
         facilityId: true,
       }).extend({
         password: z.string().min(6, "Password must be at least 6 characters"),
+        assignedFacilityIds: z.array(z.string()).optional(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
@@ -299,10 +364,16 @@ export async function registerRoutes(
         return res.status(409).json({ message: "Username already exists" });
       }
       const hashed = await bcrypt.hash(parsed.data.password, 10);
+      const { assignedFacilityIds, ...userData } = parsed.data;
       const user = await storage.createUser({
-        ...parsed.data,
+        ...userData,
         password: hashed,
       });
+
+      if (parsed.data.role === "site_admin" && assignedFacilityIds && assignedFacilityIds.length > 0) {
+        await storage.setUserFacilityAssignments(user.id, assignedFacilityIds);
+      }
+
       await storage.createAuditLog({
         action: "user_created",
         entityType: "user",
@@ -327,15 +398,17 @@ export async function registerRoutes(
       const schema = z.object({
         displayName: z.string().min(1).optional(),
         email: z.string().email().optional(),
-        role: z.enum(["admin", "user"]).optional(),
+        role: z.enum(["admin", "user", "site_admin"]).optional(),
         facilityId: z.string().nullable().optional(),
         password: z.string().min(6).optional(),
+        assignedFacilityIds: z.array(z.string()).optional(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ message: parsed.error.errors[0].message });
       }
-      const updateData: Record<string, any> = { ...parsed.data };
+      const { assignedFacilityIds, ...updateFields } = parsed.data;
+      const updateData: Record<string, any> = { ...updateFields };
       if (updateData.password) {
         updateData.password = await bcrypt.hash(updateData.password, 10);
       } else {
@@ -345,6 +418,14 @@ export async function registerRoutes(
       if (!updated) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const newRole = parsed.data.role || existing.role;
+      if (newRole === "site_admin" && assignedFacilityIds !== undefined) {
+        await storage.setUserFacilityAssignments(id, assignedFacilityIds);
+      } else if (newRole !== "site_admin") {
+        await storage.setUserFacilityAssignments(id, []);
+      }
+
       await storage.createAuditLog({
         action: "user_updated",
         entityType: "user",

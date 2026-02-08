@@ -43,6 +43,8 @@ const bookingFormSchema = z.object({
   attendees: z.string().optional(),
   guestName: z.string().optional(),
   guestEmail: z.string().optional(),
+  bookedForName: z.string().optional(),
+  bookedForEmail: z.string().optional(),
 });
 
 type BookingFormValues = z.infer<typeof bookingFormSchema>;
@@ -114,6 +116,7 @@ export default function BookRoom() {
   const { toast } = useToast();
   const { user } = useAuth();
   const isGuest = !user;
+  const isSiteAdmin = user?.role === "site_admin";
 
   const { data: facilities } = useQuery<Facility[]>({ queryKey: ["/api/facilities"] });
   const { data: rooms, isLoading } = useQuery<RoomWithFacility[]>({ queryKey: ["/api/rooms"] });
@@ -131,6 +134,8 @@ export default function BookRoom() {
       attendees: "",
       guestName: "",
       guestEmail: "",
+      bookedForName: "",
+      bookedForEmail: "",
     },
   });
 
@@ -161,6 +166,11 @@ export default function BookRoom() {
       if (isGuest) {
         body.guestName = values.guestName;
         body.guestEmail = values.guestEmail;
+      }
+
+      if (isSiteAdmin && values.bookedForName && values.bookedForEmail) {
+        body.bookedForName = values.bookedForName;
+        body.bookedForEmail = values.bookedForEmail;
       }
 
       const res = await apiRequest("POST", "/api/bookings", body);
@@ -267,6 +277,46 @@ export default function BookRoom() {
                           <FormLabel>Email</FormLabel>
                           <FormControl>
                             <Input type="email" placeholder="you@company.com" {...field} data-testid="input-guest-email" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
+              {isSiteAdmin && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Booking On Behalf Of
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-xs text-muted-foreground">Leave blank to book for yourself</p>
+                    <FormField
+                      control={form.control}
+                      name="bookedForName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., Jane Smith (CEO)" {...field} data-testid="input-booked-for-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="bookedForEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="jane@company.com" {...field} data-testid="input-booked-for-email" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -472,8 +522,11 @@ export default function BookRoom() {
                         <SelectValue placeholder="Filter by facility" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Facilities</SelectItem>
-                        {facilities?.map((f) => (
+                        <SelectItem value="all">{isSiteAdmin ? "All Assigned Facilities" : "All Facilities"}</SelectItem>
+                        {(isSiteAdmin && user?.assignedFacilityIds?.length
+                          ? facilities?.filter((f) => user.assignedFacilityIds!.includes(f.id))
+                          : facilities
+                        )?.map((f) => (
                           <SelectItem key={f.id} value={f.id}>
                             {f.name} ({getTimezoneAbbr(f.timezone)})
                           </SelectItem>
@@ -488,7 +541,10 @@ export default function BookRoom() {
                       <FormItem>
                         <FormControl>
                           <RoomSelector
-                            rooms={rooms || []}
+                            rooms={isSiteAdmin && user?.assignedFacilityIds?.length
+                              ? (rooms || []).filter((r) => user.assignedFacilityIds!.includes(r.facilityId))
+                              : (rooms || [])
+                            }
                             value={field.value}
                             onChange={field.onChange}
                             facilityId={selectedFacility !== "all" ? selectedFacility : undefined}

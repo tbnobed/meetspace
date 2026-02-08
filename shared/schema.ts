@@ -3,7 +3,7 @@ import { pgTable, text, varchar, integer, boolean, timestamp, pgEnum } from "dri
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const userRoleEnum = pgEnum("user_role", ["admin", "user"]);
+export const userRoleEnum = pgEnum("user_role", ["admin", "user", "site_admin"]);
 export const bookingStatusEnum = pgEnum("booking_status", ["confirmed", "cancelled", "pending"]);
 export const auditActionEnum = pgEnum("audit_action", [
   "booking_created", "booking_cancelled", "booking_modified",
@@ -40,6 +40,12 @@ export const users = pgTable("users", {
   facilityId: varchar("facility_id").references(() => facilities.id),
 });
 
+export const userFacilityAssignments = pgTable("user_facility_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  facilityId: varchar("facility_id").notNull().references(() => facilities.id, { onDelete: "cascade" }),
+});
+
 export const bookings = pgTable("bookings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   roomId: varchar("room_id").notNull().references(() => rooms.id),
@@ -52,6 +58,8 @@ export const bookings = pgTable("bookings", {
   meetingType: text("meeting_type").default("none"),
   attendees: text("attendees").array(),
   isRecurring: boolean("is_recurring").notNull().default(false),
+  bookedForName: text("booked_for_name"),
+  bookedForEmail: text("booked_for_email"),
 });
 
 export const auditLogs = pgTable("audit_logs", {
@@ -71,7 +79,10 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true }).extend({
   startTime: z.string().or(z.date()),
   endTime: z.string().or(z.date()),
+  bookedForName: z.string().nullable().optional(),
+  bookedForEmail: z.string().nullable().optional(),
 });
+export const insertUserFacilityAssignmentSchema = createInsertSchema(userFacilityAssignments).omit({ id: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, timestamp: true });
 
 // Types
@@ -83,6 +94,8 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Booking = typeof bookings.$inferSelect;
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
+export type UserFacilityAssignment = typeof userFacilityAssignments.$inferSelect;
+export type InsertUserFacilityAssignment = z.infer<typeof insertUserFacilityAssignmentSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 

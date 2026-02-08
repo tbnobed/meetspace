@@ -88,6 +88,14 @@ app.use((req, res, next) => {
 
 (async () => {
   if (process.env.NODE_ENV !== "production") {
+    const { db: dbInstance } = await import("./db");
+    const { sql: rawSql } = await import("drizzle-orm");
+    try {
+      await dbInstance.execute(rawSql`ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'site_admin'`);
+      log("Ensured site_admin role exists in enum", "db");
+    } catch (e) {
+      // Ignore if already exists or in transaction
+    }
     const { execSync } = await import("child_process");
     try {
       execSync("npx drizzle-kit push --force", { stdio: "inherit" });

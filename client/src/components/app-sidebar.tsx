@@ -34,6 +34,7 @@ export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "admin";
+  const isSiteAdmin = user?.role === "site_admin";
 
   return (
     <Sidebar>
@@ -97,6 +98,9 @@ export function AppSidebar() {
             <div className="text-xs">
               <p className="font-medium truncate" data-testid="text-user-name">{user.displayName}</p>
               <p className="text-muted-foreground truncate">{user.email}</p>
+              {isSiteAdmin && (
+                <Badge variant="outline" className="text-[10px] mt-1 border-primary/50">Site Admin</Badge>
+              )}
             </div>
             <Button
               variant="outline"
