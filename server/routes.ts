@@ -87,6 +87,20 @@ export async function registerRoutes(
     res.json(result);
   });
 
+  app.get("/api/bookings/range", async (req, res) => {
+    const { start, end } = req.query;
+    if (!start || !end) {
+      return res.status(400).json({ message: "start and end query parameters are required" });
+    }
+    const startDate = new Date(start as string);
+    const endDate = new Date(end as string);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res.status(400).json({ message: "Invalid date format" });
+    }
+    const result = await storage.getBookingsByRange(startDate, endDate);
+    res.json(result);
+  });
+
   app.get("/api/bookings/today", async (_req, res) => {
     const result = await storage.getTodayBookings();
     res.json(result);

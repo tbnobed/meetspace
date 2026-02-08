@@ -15,12 +15,14 @@ import AdminRooms from "@/pages/admin/rooms";
 import AdminFacilities from "@/pages/admin/facilities";
 import AdminUsers from "@/pages/admin/users";
 import AdminAuditLog from "@/pages/admin/audit-log";
+import CalendarView from "@/pages/calendar";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/calendar" component={CalendarView} />
       <Route path="/book" component={BookRoom} />
       <Route path="/bookings" component={MyBookings} />
       <Route path="/admin/rooms" component={AdminRooms} />

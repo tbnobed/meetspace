@@ -11,6 +11,7 @@ Conference room management system for a multi-facility organization with ~20 con
 
 ## Key Pages
 - `/` - Dashboard with real-time room availability across all facilities
+- `/calendar` - Calendar view with day, week, and month modes, facility filtering, timezone-aware display
 - `/book` - Book a conference room with date/time selection
 - `/bookings` - View and manage personal bookings
 - `/admin/rooms` - Room CRUD management
@@ -34,6 +35,7 @@ All routes prefixed with `/api/`:
 - `GET/POST /api/facilities`, `PATCH /api/facilities/:id`
 - `GET/POST /api/rooms`, `PATCH /api/rooms/:id`
 - `GET/POST /api/bookings`, `PATCH /api/bookings/:id/cancel`
+- `GET /api/bookings/range?start=ISO&end=ISO` - Date range query
 - `GET /api/bookings/today`
 - `GET /api/users`
 - `GET /api/audit-logs`

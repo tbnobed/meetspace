@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, CalendarPlus, DoorOpen, Building2, Users, ClipboardList, Settings } from "lucide-react";
+import { LayoutDashboard, CalendarPlus, CalendarDays, DoorOpen, Building2, Users, ClipboardList, Settings } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 
 const mainNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Calendar", url: "/calendar", icon: CalendarDays },
   { title: "Book a Room", url: "/book", icon: CalendarPlus },
   { title: "My Bookings", url: "/bookings", icon: ClipboardList },
 ];

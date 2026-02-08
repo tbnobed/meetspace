@@ -31,6 +31,7 @@ export interface IStorage {
 
   // Bookings
   getBookings(): Promise<BookingWithDetails[]>;
+  getBookingsByRange(start: Date, end: Date): Promise<BookingWithDetails[]>;
   getTodayBookings(): Promise<BookingWithDetails[]>;
   getBooking(id: string): Promise<BookingWithDetails | undefined>;
   createBooking(data: InsertBooking): Promise<Booking>;
@@ -130,6 +131,29 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
       .innerJoin(users, eq(bookings.userId, users.id))
       .orderBy(desc(bookings.startTime));
+    return result.map((r) => ({
+      ...r.bookings,
+      room: r.rooms,
+      facility: r.facilities,
+      user: { id: r.users.id, displayName: r.users.displayName, email: r.users.email },
+    }));
+  }
+
+  async getBookingsByRange(start: Date, end: Date): Promise<BookingWithDetails[]> {
+    const result = await db
+      .select()
+      .from(bookings)
+      .innerJoin(rooms, eq(bookings.roomId, rooms.id))
+      .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
+      .innerJoin(users, eq(bookings.userId, users.id))
+      .where(
+        and(
+          gte(bookings.endTime, start),
+          lte(bookings.startTime, end),
+          ne(bookings.status, "cancelled")
+        )
+      )
+      .orderBy(bookings.startTime);
     return result.map((r) => ({
       ...r.bookings,
       room: r.rooms,
