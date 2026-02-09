@@ -33,7 +33,7 @@ import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getTimezoneAbbr } from "@/lib/constants";
-import { Plus, Users, Shield, Building2, Pencil, Trash2, MapPin, CheckCircle, Clock } from "lucide-react";
+import { Plus, Users, Shield, Building2, Pencil, Trash2, MapPin, CheckCircle, Clock, Mail, Send } from "lucide-react";
 import type { User, Facility } from "@shared/schema";
 
 type UserWithFacility = User & { facility?: Facility; assignedFacilityIds?: string[] };
@@ -274,6 +274,209 @@ function UserFormDialog({ user, facilities, open, onOpenChange }: {
   );
 }
 
+const inviteFormSchema = z.object({
+  email: z.string().email("Valid email is required"),
+  displayName: z.string().min(1, "Display name is required"),
+  role: z.enum(["admin", "user", "site_admin"]),
+  facilityId: z.string().optional(),
+  assignedFacilityIds: z.array(z.string()).optional(),
+});
+
+type InviteFormValues = z.infer<typeof inviteFormSchema>;
+
+function InviteUserDialog({ facilities, open, onOpenChange }: {
+  facilities: Facility[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+
+  const form = useForm<InviteFormValues>({
+    resolver: zodResolver(inviteFormSchema),
+    defaultValues: {
+      email: "",
+      displayName: "",
+      role: "user",
+      facilityId: "",
+      assignedFacilityIds: [],
+    },
+  });
+
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        email: "",
+        displayName: "",
+        role: "user",
+        facilityId: "",
+        assignedFacilityIds: [],
+      });
+    }
+  }, [open]);
+
+  const watchRole = form.watch("role");
+
+  const mutation = useMutation({
+    mutationFn: async (values: InviteFormValues) => {
+      const body: Record<string, any> = { ...values };
+      if (!body.facilityId || body.facilityId === "none") {
+        body.facilityId = null;
+      }
+      if (body.role !== "site_admin") {
+        delete body.assignedFacilityIds;
+      }
+      return apiRequest("POST", "/api/users/invite", body);
+    },
+    onSuccess: async (response) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      const data = await response.json();
+      if (data.emailSent) {
+        toast({ title: "Invite sent", description: `An invitation email has been sent to ${form.getValues("email")}` });
+      } else {
+        toast({ title: "User created", description: "User was created but the invite email could not be sent. Check your SendGrid configuration.", variant: "destructive" });
+      }
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            <div className="flex items-center gap-2">
+              <Mail className="w-5 h-5" />
+              Invite User via Email
+            </div>
+          </DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email Address</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="user@company.com" {...field} data-testid="input-invite-email" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="displayName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Display Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Jane Doe" {...field} data-testid="input-invite-displayname" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-invite-role">
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="user">User</SelectItem>
+                        <SelectItem value="site_admin">Site Admin</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="facilityId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Primary Facility</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-invite-facility">
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {facilities.map((f) => (
+                          <SelectItem key={f.id} value={f.id}>
+                            {f.name} ({getTimezoneAbbr(f.timezone)})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            {watchRole === "site_admin" && (
+              <FormField
+                control={form.control}
+                name="assignedFacilityIds"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assigned Facilities</FormLabel>
+                    <p className="text-xs text-muted-foreground mb-2">Select which facilities this site admin can book rooms at</p>
+                    <div className="space-y-2 border rounded-md p-3">
+                      {facilities.map((f) => {
+                        const checked = (field.value || []).includes(f.id);
+                        return (
+                          <label key={f.id} className="flex items-center gap-2 cursor-pointer" data-testid={`checkbox-invite-facility-${f.id}`}>
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(val) => {
+                                const current = field.value || [];
+                                if (val) {
+                                  field.onChange([...current, f.id]);
+                                } else {
+                                  field.onChange(current.filter((id: string) => id !== f.id));
+                                }
+                              }}
+                            />
+                            <span className="text-sm">{f.name}</span>
+                            <span className="text-xs text-muted-foreground">({getTimezoneAbbr(f.timezone)})</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            <p className="text-xs text-muted-foreground">A temporary password will be generated and sent to the user along with their login credentials.</p>
+            <Button type="submit" className="w-full" disabled={mutation.isPending} data-testid="button-send-invite">
+              <Send className="w-4 h-4 mr-2" />
+              {mutation.isPending ? "Sending Invite..." : "Send Invite"}
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function getRoleBadge(role: string) {
   switch (role) {
     case "admin":
@@ -301,6 +504,7 @@ function getRoleBadge(role: string) {
 
 export default function AdminUsers() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserWithFacility | undefined>();
   const [deleteUser, setDeleteUser] = useState<UserWithFacility | undefined>();
   const { toast } = useToast();
@@ -361,10 +565,16 @@ export default function AdminUsers() {
         title="User Management"
         description="Add, edit, and manage user accounts"
         actions={
-          <Button onClick={handleAdd} data-testid="button-add-user">
-            <Plus className="w-4 h-4 mr-2" />
-            Add User
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setInviteDialogOpen(true)} data-testid="button-invite-user">
+              <Mail className="w-4 h-4 mr-2" />
+              Invite via Email
+            </Button>
+            <Button onClick={handleAdd} data-testid="button-add-user">
+              <Plus className="w-4 h-4 mr-2" />
+              Add User
+            </Button>
+          </div>
         }
       />
 
@@ -477,6 +687,12 @@ export default function AdminUsers() {
         facilities={facilities || []}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+      />
+
+      <InviteUserDialog
+        facilities={facilities || []}
+        open={inviteDialogOpen}
+        onOpenChange={setInviteDialogOpen}
       />
 
       <AlertDialog open={!!deleteUser} onOpenChange={(open) => !open && setDeleteUser(undefined)}>

@@ -8,6 +8,7 @@ Conference room management system for a multi-facility organization with ~20 con
 - **Backend**: Express.js with TypeScript
 - **Database**: PostgreSQL with Drizzle ORM
 - **Auth**: Session-based with bcryptjs password hashing and PostgreSQL session store (connect-pg-simple)
+- **Email**: SendGrid integration via @sendgrid/mail for transactional emails
 
 ## Authentication
 - Login/register at `/auth` page with session-based auth
@@ -73,8 +74,20 @@ All routes prefixed with `/api/`:
 - `POST /api/rooms`, `PATCH /api/rooms/:id`
 - `GET /api/users` - List users (includes assignedFacilityIds for site_admin users)
 - `POST /api/users` - Create user (supports assignedFacilityIds for site_admin)
+- `POST /api/users/invite` - Invite user via email (creates account with temp password, sends invite email)
 - `PATCH /api/users/:id` - Update user (supports assignedFacilityIds)
 - `DELETE /api/users/:id` - Delete user
 - `GET /api/users/:id/facility-assignments` - Get user facility assignments
 - `PUT /api/users/:id/facility-assignments` - Set user facility assignments
 - `GET /api/audit-logs`
+
+## Email Notifications (SendGrid)
+- **SENDGRID_API_KEY**: Required secret for sending emails
+- **SENDGRID_FROM_EMAIL**: Environment variable for sender address (default: noreply@meetspace.io)
+- **Booking confirmation**: Sent to booker (and bookedFor person) when a room is booked
+- **Booking cancellation**: Sent to the booker when a booking is cancelled
+- **Registration alert**: Sent to all admin users when a new user registers and needs approval
+- **Approval notification**: Sent to user when their account is approved
+- **User invite**: Sent when admin invites a user via email with temporary credentials
+- Email sending is fire-and-forget (errors logged but don't block operations)
+- Email service module: `server/email.ts`

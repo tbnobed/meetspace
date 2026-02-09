@@ -4,6 +4,14 @@ import { storage } from "./storage";
 import { insertFacilitySchema, insertRoomSchema, insertBookingSchema, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import {
+  sendBookingConfirmation,
+  sendBookingCancellation,
+  sendApprovalNotification,
+  sendNewRegistrationAlert,
+  sendInviteEmail,
+} from "./email";
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
@@ -77,6 +85,15 @@ export async function registerRoutes(
       approved: false,
     });
     const { password: _, ...safeUser } = user;
+
+    const adminEmails = await storage.getAdminEmails();
+    sendNewRegistrationAlert({
+      adminEmails,
+      newUserName: user.username,
+      newUserEmail: user.email,
+      newUserDisplayName: user.displayName,
+    }).catch(() => {});
+
     res.status(201).json({ ...safeUser, pendingApproval: true });
   });
 
@@ -202,6 +219,28 @@ export async function registerRoutes(
       entityId: booking.id,
       details,
     });
+
+    const room = await storage.getRoom(parsed.data.roomId);
+    const booker = await storage.getUser(userId!);
+    if (room && booker) {
+      const formatTime = (d: Date) => d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+      const emailParams = {
+        to: booker.email,
+        displayName: booker.displayName,
+        title: booking.title,
+        roomName: room.name,
+        facilityName: room.facility.name,
+        startTime: formatTime(new Date(booking.startTime)),
+        endTime: formatTime(new Date(booking.endTime)),
+        meetingType: booking.meetingType || undefined,
+        bookedForName: bookedForName,
+      };
+      sendBookingConfirmation(emailParams).catch(() => {});
+      if (bookedForEmail) {
+        sendBookingConfirmation({ ...emailParams, to: bookedForEmail, displayName: bookedForName || "User" }).catch(() => {});
+      }
+    }
+
     res.status(201).json(booking);
   });
 
@@ -237,6 +276,7 @@ export async function registerRoutes(
   });
 
   app.patch("/api/bookings/:id/cancel", requireAuth, async (req, res) => {
+    const bookingDetails = await storage.getBooking(req.params.id as string);
     const booking = await storage.cancelBooking(req.params.id as string);
     if (!booking) return res.status(404).json({ message: "Booking not found" });
     await storage.createAuditLog({
@@ -246,6 +286,20 @@ export async function registerRoutes(
       entityId: booking.id,
       details: `Cancelled booking: ${booking.title}`,
     });
+
+    if (bookingDetails) {
+      const formatTime = (d: Date) => d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+      sendBookingCancellation({
+        to: bookingDetails.user.email,
+        displayName: bookingDetails.user.displayName,
+        title: booking.title,
+        roomName: bookingDetails.room.name,
+        facilityName: bookingDetails.facility.name,
+        startTime: formatTime(new Date(booking.startTime)),
+        endTime: formatTime(new Date(booking.endTime)),
+      }).catch(() => {});
+    }
+
     res.json(booking);
   });
 
@@ -432,6 +486,13 @@ export async function registerRoutes(
         await storage.setUserFacilityAssignments(id, []);
       }
 
+      if (parsed.data.approved === true && !existing.approved) {
+        sendApprovalNotification({
+          to: updated.email,
+          displayName: updated.displayName,
+        }).catch(() => {});
+      }
+
       await storage.createAuditLog({
         action: "user_updated",
         entityType: "user",
@@ -473,6 +534,64 @@ export async function registerRoutes(
         return res.status(409).json({ message: "Cannot delete user with existing bookings. Cancel their bookings first." });
       }
       res.status(500).json({ message: error.message || "Failed to delete user" });
+    }
+  });
+
+  app.post("/api/users/invite", requireAdmin, async (req, res) => {
+    try {
+      const schema = z.object({
+        email: z.string().email("Valid email is required"),
+        displayName: z.string().min(1, "Display name is required"),
+        role: z.enum(["admin", "user", "site_admin"]).default("user"),
+        facilityId: z.string().nullable().optional(),
+        assignedFacilityIds: z.array(z.string()).optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0].message });
+      }
+
+      const existingByEmail = await storage.getUserByEmail(parsed.data.email);
+      if (existingByEmail) {
+        return res.status(409).json({ message: "A user with this email already exists" });
+      }
+
+      const tempPassword = crypto.randomBytes(6).toString("base64url");
+      const username = parsed.data.email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "") + "_" + Date.now().toString(36).slice(-4);
+      const hashed = await bcrypt.hash(tempPassword, 10);
+
+      const { assignedFacilityIds, ...userData } = parsed.data;
+      const user = await storage.createUser({
+        ...userData,
+        username,
+        password: hashed,
+        facilityId: userData.facilityId || null,
+        approved: true,
+      });
+
+      if (parsed.data.role === "site_admin" && assignedFacilityIds && assignedFacilityIds.length > 0) {
+        await storage.setUserFacilityAssignments(user.id, assignedFacilityIds);
+      }
+
+      const emailSent = await sendInviteEmail({
+        to: parsed.data.email,
+        displayName: parsed.data.displayName,
+        username,
+        tempPassword,
+      });
+
+      await storage.createAuditLog({
+        action: "user_created",
+        entityType: "user",
+        entityId: user.id,
+        userId: req.session.userId as string,
+        details: JSON.stringify({ action: "invite_sent", username, email: parsed.data.email, emailSent }),
+      });
+
+      const { password: _, ...safeUser } = user;
+      res.status(201).json({ ...safeUser, emailSent });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to invite user" });
     }
   });
 

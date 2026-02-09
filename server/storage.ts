@@ -32,6 +32,7 @@ export interface IStorage {
   createUser(data: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
+  getAdminEmails(): Promise<string[]>;
 
   // User Facility Assignments
   getUserFacilityAssignments(userId: string): Promise<UserFacilityAssignment[]>;
@@ -143,6 +144,11 @@ export class DatabaseStorage implements IStorage {
   async deleteUser(id: string): Promise<boolean> {
     const result = await db.delete(users).where(eq(users.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getAdminEmails(): Promise<string[]> {
+    const admins = await db.select({ email: users.email }).from(users).where(eq(users.role, "admin"));
+    return admins.map((a) => a.email);
   }
 
   // User Facility Assignments
