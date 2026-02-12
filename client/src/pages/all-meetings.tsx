@@ -136,7 +136,7 @@ export default function AllMeetings() {
   return (
     <div>
       <PageHeader
-        title="All Meetings"
+        title="All Rooms"
         description="Real-time conference room availability across all facilities"
         actions={
           <Link href="/book">
