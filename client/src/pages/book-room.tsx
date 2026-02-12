@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -111,7 +111,7 @@ export default function BookRoom() {
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
   const preselectedRoom = params.get("room") || "";
-  const [selectedFacility, setSelectedFacility] = useState<string>("all");
+  const [selectedFacility, setSelectedFacility] = useState<string>("");
   const [bookingComplete, setBookingComplete] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -120,6 +120,15 @@ export default function BookRoom() {
 
   const { data: facilities } = useQuery<Facility[]>({ queryKey: ["/api/facilities"] });
   const { data: rooms, isLoading } = useQuery<RoomWithFacility[]>({ queryKey: ["/api/rooms"] });
+
+  useEffect(() => {
+    if (preselectedRoom && rooms) {
+      const room = rooms.find((r) => r.id === preselectedRoom);
+      if (room) {
+        setSelectedFacility(room.facilityId);
+      }
+    }
+  }, [preselectedRoom, rooms]);
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
@@ -516,13 +525,12 @@ export default function BookRoom() {
                 </CardHeader>
                 <CardContent>
                   <div className="mb-4">
-                    <Select value={selectedFacility} onValueChange={setSelectedFacility}>
+                    <Select value={selectedFacility} onValueChange={(val) => { setSelectedFacility(val); form.setValue("roomId", ""); }}>
                       <SelectTrigger data-testid="select-facility-filter">
                         <Building2 className="w-4 h-4 mr-2" />
-                        <SelectValue placeholder="Filter by facility" />
+                        <SelectValue placeholder="Select a facility first" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">{isSiteAdmin ? "All Assigned Facilities" : "All Facilities"}</SelectItem>
                         {(isSiteAdmin && user?.assignedFacilityIds?.length
                           ? facilities?.filter((f) => user.assignedFacilityIds!.includes(f.id))
                           : facilities
@@ -534,26 +542,32 @@ export default function BookRoom() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <FormField
-                    control={form.control}
-                    name="roomId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <RoomSelector
-                            rooms={isSiteAdmin && user?.assignedFacilityIds?.length
-                              ? (rooms || []).filter((r) => user.assignedFacilityIds!.includes(r.facilityId))
-                              : (rooms || [])
-                            }
-                            value={field.value}
-                            onChange={field.onChange}
-                            facilityId={selectedFacility !== "all" ? selectedFacility : undefined}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {selectedFacility ? (
+                    <FormField
+                      control={form.control}
+                      name="roomId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <RoomSelector
+                              rooms={isSiteAdmin && user?.assignedFacilityIds?.length
+                                ? (rooms || []).filter((r) => user.assignedFacilityIds!.includes(r.facilityId))
+                                : (rooms || [])
+                              }
+                              value={field.value}
+                              onChange={field.onChange}
+                              facilityId={selectedFacility}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      Please select a facility to see available rooms
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
