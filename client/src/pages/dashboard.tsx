@@ -488,55 +488,78 @@ function DayView({
         </div>
       </div>
       <div className="overflow-y-auto max-h-[600px]">
-        {hours.map((hour) => {
-          const hourBookings = dayBookings.filter((b) => {
-            return getLocalHour(b.startTime) === hour;
-          });
-
-          return (
-            <div key={hour} className="flex border-b last:border-b-0">
-              <div className="w-16 flex-shrink-0 p-2 text-xs text-muted-foreground text-right pr-3 pt-1">
+        <div className="flex">
+          <div className="w-16 flex-shrink-0">
+            {hours.map((hour) => (
+              <div key={hour} className="h-[60px] p-2 text-xs text-muted-foreground text-right pr-3 pt-1 border-b last:border-b-0">
                 {hour === 0 ? "12 AM" : hour < 12 ? `${hour} AM` : hour === 12 ? "12 PM" : `${hour - 12} PM`}
               </div>
-              <div className="flex-1 min-h-[56px] border-l p-1 space-y-1">
-                {hourBookings.map((b) => (
-                  <div
-                    key={b.id}
-                    className={`rounded border px-3 py-2 ${getBookingColor(b.roomId)}`}
-                    data-testid={`day-booking-${b.id}`}
-                  >
-                    <div className="flex items-start justify-between gap-2 flex-wrap">
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium text-sm">{b.title}</div>
-                        <div className="flex items-center gap-3 mt-1 text-xs opacity-80 flex-wrap">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3 flex-shrink-0" />
-                            {formatTime(b.startTime)} - {formatTime(b.endTime)}
-                            {" "}({getBrowserTimezoneAbbr()})
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3 flex-shrink-0" />
-                            {b.room.name} - {b.facility.name}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Users className="w-3 h-3 flex-shrink-0" />
-                            {b.user.displayName}
-                          </span>
-                          {b.meetingType && b.meetingType !== "none" && (
+            ))}
+          </div>
+          <div className="flex-1 border-l relative">
+            {hours.map((hour) => (
+              <div key={hour} className="h-[60px] border-b last:border-b-0" />
+            ))}
+            {(() => {
+              const layoutMap = computeOverlapLayout(dayBookings);
+              const firstHour = hours[0] ?? 0;
+              return dayBookings.map((b) => {
+                const startH = getLocalHour(b.startTime);
+                const startM = getLocalMinute(b.startTime);
+                const endH = getLocalHour(b.endTime);
+                const endM = getLocalMinute(b.endTime);
+                const startOffset = (startH - firstHour) * 60 + startM;
+                const endOffset = (endH - firstHour) * 60 + endM;
+                const durationMins = endOffset - startOffset;
+                const topPx = (startOffset / 60) * 60;
+                const heightPx = Math.max(24, (durationMins / 60) * 60 - 2);
+                const layout = layoutMap.get(b.id) || { col: 0, totalCols: 1 };
+                const widthPct = 100 / layout.totalCols;
+                const leftPct = layout.col * widthPct;
+
+                return (
+                  <Tooltip key={b.id}>
+                    <TooltipTrigger asChild>
+                      <div
+                        className={`absolute rounded border px-3 py-1.5 overflow-hidden cursor-default z-10 ${getBookingColor(b.roomId)}`}
+                        style={{
+                          top: `${topPx}px`,
+                          height: `${heightPx}px`,
+                          left: `calc(${leftPct}% + 2px)`,
+                          width: `calc(${widthPct}% - 4px)`,
+                        }}
+                        data-testid={`day-booking-${b.id}`}
+                      >
+                        <div className="font-medium text-sm truncate">{b.title}</div>
+                        {heightPx > 32 && (
+                          <div className="flex items-center gap-3 mt-0.5 text-xs opacity-80 flex-wrap">
                             <span className="flex items-center gap-1">
-                              {getMeetingTypeIcon(b.meetingType)}
-                              <span className="capitalize">{b.meetingType}</span>
+                              <Clock className="w-3 h-3 flex-shrink-0" />
+                              {formatTime(b.startTime)} - {formatTime(b.endTime)}
                             </span>
-                          )}
-                        </div>
+                            <span className="flex items-center gap-1 truncate">
+                              <MapPin className="w-3 h-3 flex-shrink-0" />
+                              {b.room.name} - {b.facility.name}
+                            </span>
+                          </div>
+                        )}
+                        {heightPx > 56 && b.meetingType && b.meetingType !== "none" && (
+                          <div className="flex items-center gap-1 mt-0.5 text-xs opacity-80">
+                            {getMeetingTypeIcon(b.meetingType)}
+                            <span className="capitalize">{b.meetingType}</span>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
+                    </TooltipTrigger>
+                    <TooltipContent side="right" align="start">
+                      <BookingTooltipContent booking={b} />
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              });
+            })()}
+          </div>
+        </div>
       </div>
     </div>
   );
