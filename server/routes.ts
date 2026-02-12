@@ -318,8 +318,23 @@ export async function registerRoutes(
   });
 
   // ── Protected Routes (require login) ──
-  app.get("/api/bookings", requireAuth, async (_req, res) => {
-    const result = await storage.getBookings();
+  app.get("/api/bookings", requireAuth, async (req, res) => {
+    const user = await storage.getUser(req.session.userId as string);
+    if (!user) return res.status(401).json({ message: "User not found" });
+
+    if (user.role === "admin") {
+      const result = await storage.getBookings();
+      return res.json(result);
+    }
+
+    if (user.role === "site_admin") {
+      const assignments = await storage.getUserFacilityAssignments(user.id);
+      const facilityIds = assignments.map((a) => a.facilityId);
+      const result = await storage.getBookingsByFacilityIds(facilityIds);
+      return res.json(result);
+    }
+
+    const result = await storage.getBookingsByUserId(user.id);
     res.json(result);
   });
 

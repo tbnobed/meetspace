@@ -42,6 +42,8 @@ export interface IStorage {
 
   // Bookings
   getBookings(): Promise<BookingWithDetails[]>;
+  getBookingsByUserId(userId: string): Promise<BookingWithDetails[]>;
+  getBookingsByFacilityIds(facilityIds: string[]): Promise<BookingWithDetails[]>;
   getBookingsByRange(start: Date, end: Date): Promise<BookingWithDetails[]>;
   getTodayBookings(): Promise<BookingWithDetails[]>;
   getBooking(id: string): Promise<BookingWithDetails | undefined>;
@@ -194,6 +196,41 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(rooms, eq(bookings.roomId, rooms.id))
       .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
       .innerJoin(users, eq(bookings.userId, users.id))
+      .orderBy(desc(bookings.startTime));
+    return result.map((r) => ({
+      ...r.bookings,
+      room: r.rooms,
+      facility: r.facilities,
+      user: { id: r.users.id, displayName: r.users.displayName, email: r.users.email },
+    }));
+  }
+
+  async getBookingsByUserId(userId: string): Promise<BookingWithDetails[]> {
+    const result = await db
+      .select()
+      .from(bookings)
+      .innerJoin(rooms, eq(bookings.roomId, rooms.id))
+      .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
+      .innerJoin(users, eq(bookings.userId, users.id))
+      .where(eq(bookings.userId, userId))
+      .orderBy(desc(bookings.startTime));
+    return result.map((r) => ({
+      ...r.bookings,
+      room: r.rooms,
+      facility: r.facilities,
+      user: { id: r.users.id, displayName: r.users.displayName, email: r.users.email },
+    }));
+  }
+
+  async getBookingsByFacilityIds(facilityIds: string[]): Promise<BookingWithDetails[]> {
+    if (facilityIds.length === 0) return [];
+    const result = await db
+      .select()
+      .from(bookings)
+      .innerJoin(rooms, eq(bookings.roomId, rooms.id))
+      .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
+      .innerJoin(users, eq(bookings.userId, users.id))
+      .where(inArray(rooms.facilityId, facilityIds))
       .orderBy(desc(bookings.startTime));
     return result.map((r) => ({
       ...r.bookings,

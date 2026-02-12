@@ -41,6 +41,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { BookingWithDetails } from "@shared/schema";
+import { useAuth } from "@/lib/auth";
 
 function RoomStatusBadge({ bookingId }: { bookingId: string }) {
   const { data, isLoading } = useQuery<{
@@ -218,9 +219,20 @@ function BookingCard({ booking }: { booking: BookingWithDetails }) {
 }
 
 export default function MyBookings() {
+  const { user } = useAuth();
   const { data: bookings, isLoading } = useQuery<BookingWithDetails[]>({
     queryKey: ["/api/bookings"],
   });
+
+  const isAdmin = user?.role === "admin";
+  const isSiteAdmin = user?.role === "site_admin";
+
+  const pageTitle = isAdmin ? "All Bookings" : isSiteAdmin ? "Facility Bookings" : "My Bookings";
+  const pageDescription = isAdmin
+    ? "View and manage all conference room reservations across all facilities"
+    : isSiteAdmin
+      ? "View and manage bookings for your assigned facilities"
+      : "View and manage your conference room reservations";
 
   const now = new Date();
   const upcoming = bookings?.filter(
@@ -247,8 +259,8 @@ export default function MyBookings() {
   return (
     <div>
       <PageHeader
-        title="My Bookings"
-        description="View and manage your conference room reservations"
+        title={pageTitle}
+        description={pageDescription}
         actions={
           <Link href="/book">
             <Button data-testid="button-new-booking-from-list">
