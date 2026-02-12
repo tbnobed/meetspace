@@ -2,7 +2,7 @@
 set -e
 
 echo "Running database schema migration..."
-npx drizzle-kit push --force 2>&1
+./node_modules/.bin/drizzle-kit push --force 2>&1
 if [ $? -ne 0 ]; then
   echo "ERROR: drizzle-kit push failed. Cannot start without database schema."
   exit 1
