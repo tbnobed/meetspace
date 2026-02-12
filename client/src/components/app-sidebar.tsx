@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
+import sidebarLogo from "@assets/MeetSpace_noText_1770928191478.png";
 
 const mainNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -40,15 +41,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-9 h-9 rounded-md bg-primary">
-            <Building2 className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold tracking-tight">MeetSpace</span>
-            <span className="text-xs text-muted-foreground">Room Manager</span>
-          </div>
-        </div>
+        <img src={sidebarLogo} alt="MeetSpace" className="h-10 object-contain" data-testid="img-sidebar-logo" />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
