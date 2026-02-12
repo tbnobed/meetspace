@@ -220,6 +220,39 @@ export async function getCalendarEvents(
   return allEvents;
 }
 
+export async function getEventDetails(
+  userOrRoomEmail: string,
+  eventId: string
+): Promise<{
+  roomResponse: string;
+  roomEmail: string | null;
+  attendees: { email: string; name: string; type: string; response: string }[];
+} | null> {
+  try {
+    const event = await graphFetch(
+      `/users/${userOrRoomEmail}/events/${eventId}?$select=attendees`
+    );
+    if (!event || !event.attendees) return null;
+
+    const attendees = event.attendees.map((a: any) => ({
+      email: a.emailAddress?.address || "",
+      name: a.emailAddress?.name || "",
+      type: a.type || "required",
+      response: a.status?.response || "none",
+    }));
+
+    const roomAttendee = attendees.find((a: any) => a.type === "resource");
+    return {
+      roomResponse: roomAttendee?.response || "none",
+      roomEmail: roomAttendee?.email || null,
+      attendees,
+    };
+  } catch (error: any) {
+    console.error(`Failed to get event details for ${eventId}:`, error.message);
+    return null;
+  }
+}
+
 export async function testConnection(): Promise<{ success: boolean; message: string; roomCount?: number }> {
   try {
     const rooms = await listGraphRooms();

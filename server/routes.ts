@@ -19,6 +19,7 @@ import {
   createCalendarEvent,
   cancelCalendarEvent,
   getCalendarEvents,
+  getEventDetails,
   testConnection as testGraphConnection,
 } from "./graph";
 
@@ -348,6 +349,37 @@ export async function registerRoutes(
 
     io.emit("bookings:updated");
     res.json(booking);
+  });
+
+  // ── Booking Room Status (Graph) ──
+  app.get("/api/bookings/:id/room-status", requireAuth, async (req, res) => {
+    try {
+      if (!isGraphConfigured()) {
+        return res.json({ status: "unavailable", message: "Microsoft 365 integration not configured" });
+      }
+      const allBookings = await storage.getBookings();
+      const booking = allBookings.find((b) => b.id === req.params.id);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+      if (!booking.msGraphEventId) {
+        return res.json({ status: "unavailable", message: "No calendar event linked" });
+      }
+      const allRooms = await storage.getRooms();
+      const room = allRooms.find((r) => r.id === booking.roomId);
+      if (!room?.msGraphRoomEmail) {
+        return res.json({ status: "unavailable", message: "Room has no Microsoft 365 email" });
+      }
+      const details = await getEventDetails(room.msGraphRoomEmail, booking.msGraphEventId);
+      if (!details) {
+        return res.json({ status: "unknown", message: "Could not retrieve event details" });
+      }
+      res.json({
+        status: details.roomResponse,
+        roomEmail: details.roomEmail,
+        attendees: details.attendees,
+      });
+    } catch (error: any) {
+      res.json({ status: "error", message: error.message || "Failed to check room status" });
+    }
   });
 
   // ── User Facility Assignments ──
