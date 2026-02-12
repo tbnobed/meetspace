@@ -19,7 +19,7 @@ import sidebarLogo from "../assets/images/MeetSpace_noText.png";
 
 const mainNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Rooms", url: "/rooms", icon: List },
+  { title: "Rooms", url: "/meetings", icon: List },
   { title: "Book a Room", url: "/book", icon: CalendarPlus },
   { title: "My Bookings", url: "/bookings", icon: ClipboardList },
 ];

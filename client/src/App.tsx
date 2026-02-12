@@ -70,7 +70,7 @@ function AuthenticatedLayout() {
             <main className="p-6 max-w-7xl mx-auto w-full">
               <Switch>
                 <Route path="/">{() => <ProtectedRoute component={Dashboard} />}</Route>
-                <Route path="/rooms">{() => <ProtectedRoute component={AllMeetings} />}</Route>
+                <Route path="/meetings">{() => <ProtectedRoute component={AllMeetings} />}</Route>
                 <Route path="/book" component={BookRoom} />
                 <Route path="/bookings">{() => <ProtectedRoute component={MyBookings} />}</Route>
                 <Route path="/admin/rooms">{() => <AdminRoute component={AdminRooms} />}</Route>
