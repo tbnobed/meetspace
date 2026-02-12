@@ -244,14 +244,10 @@ export default function BookRoom() {
 
   const content = (
     <div>
-      {isGuest && (
-        <div className="mb-4">
-          <img src={logoImage} alt="MeetSpace" className="w-64 object-contain" data-testid="img-book-logo" />
-        </div>
-      )}
       <PageHeader
         title="Book a Room"
         description={isGuest ? "Book a conference room — no account required" : "Select a room and schedule your meeting"}
+        actions={isGuest ? <img src={logoImage} alt="MeetSpace" className="w-48 object-contain" data-testid="img-book-logo" /> : undefined}
       />
       {isGuest && (
         <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
