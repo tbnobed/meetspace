@@ -15,7 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import sidebarLogo from "@assets/MeetSpace_noText_1770928191478.png";
+import sidebarLogo from "../assets/images/MeetSpace_noText.png";
 
 const mainNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
