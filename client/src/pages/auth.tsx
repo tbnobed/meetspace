@@ -179,9 +179,6 @@ export default function AuthPage() {
                     </Button>
                   </form>
                 </Form>
-                <div className="mt-4 text-xs text-muted-foreground text-center space-y-1">
-                  <p>Demo accounts: admin / admin123 or jdoe / password</p>
-                </div>
               </TabsContent>
 
               <TabsContent value="register" className="mt-6">
