@@ -25,7 +25,21 @@ import type { Facility, RoomWithFacility, BookingWithDetails } from "@shared/sch
 
 type ViewMode = "month" | "week" | "day";
 
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 7);
+const DEFAULT_START_HOUR = 7;
+const DEFAULT_END_HOUR = 20;
+
+function computeHours(bookings: BookingWithDetails[]): number[] {
+  let minHour = DEFAULT_START_HOUR;
+  let maxHour = DEFAULT_END_HOUR;
+  for (const b of bookings) {
+    const tz = b.facility.timezone;
+    const startH = getHourInZone(b.startTime, tz);
+    const endH = getHourInZone(b.endTime, tz);
+    if (startH < minHour) minHour = startH;
+    if (endH > maxHour) maxHour = endH;
+  }
+  return Array.from({ length: maxHour - minHour + 1 }, (_, i) => i + minHour);
+}
 
 function getHourInZone(date: Date | string, timezone: string): number {
   const d = typeof date === "string" ? new Date(date) : date;
@@ -297,6 +311,9 @@ function WeekView({
     ? bookings
     : bookings.filter((b) => b.facility.id === facilityFilter);
 
+  const allWeekBookings = weekDates.flatMap((day) => getBookingsForDay(filtered, day));
+  const hours = computeHours(allWeekBookings);
+
   return (
     <div className="border rounded-md overflow-hidden" data-testid="calendar-week-view">
       <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b">
@@ -322,7 +339,7 @@ function WeekView({
         })}
       </div>
       <div className="overflow-y-auto max-h-[600px]">
-        {HOURS.map((hour) => (
+        {hours.map((hour) => (
           <div key={hour} className="grid grid-cols-[60px_repeat(7,1fr)] border-b last:border-b-0">
             <div className="p-1.5 text-xs text-muted-foreground text-right pr-2 pt-0 -mt-2">
               {hour === 0 ? "12 AM" : hour < 12 ? `${hour} AM` : hour === 12 ? "12 PM" : `${hour - 12} PM`}
@@ -391,6 +408,7 @@ function DayView({
     : bookings.filter((b) => b.facility.id === facilityFilter);
 
   const dayBookings = getBookingsForDay(filtered, currentDate);
+  const hours = computeHours(dayBookings);
 
   return (
     <div className="border rounded-md overflow-hidden" data-testid="calendar-day-view">
@@ -410,7 +428,7 @@ function DayView({
         </div>
       </div>
       <div className="overflow-y-auto max-h-[600px]">
-        {HOURS.map((hour) => {
+        {hours.map((hour) => {
           const hourBookings = dayBookings.filter((b) => {
             const tz = b.facility.timezone;
             return getHourInZone(b.startTime, tz) === hour;
