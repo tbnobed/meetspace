@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { Building2, LogIn, UserPlus, Clock } from "lucide-react";
+import { LogIn, UserPlus, Clock } from "lucide-react";
+import logoImage from "@assets/image_1770927456023.png";
 import type { Facility } from "@shared/schema";
 
 const loginSchema = z.object({
@@ -92,14 +93,8 @@ export default function AuthPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="w-full max-w-md">
-          <div className="flex items-center justify-center gap-3 mb-8">
-            <div className="flex items-center justify-center w-12 h-12 rounded-md bg-primary">
-              <Building2 className="w-7 h-7 text-primary-foreground" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xl font-semibold tracking-tight">MeetSpace</span>
-              <span className="text-sm text-muted-foreground">Room Manager</span>
-            </div>
+          <div className="flex items-center justify-center mb-8">
+            <img src={logoImage} alt="MeetSpace Manager" className="h-16 object-contain" data-testid="img-auth-logo" />
           </div>
 
           <Card>
@@ -132,14 +127,8 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="flex items-center justify-center w-12 h-12 rounded-md bg-primary">
-            <Building2 className="w-7 h-7 text-primary-foreground" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-xl font-semibold tracking-tight">MeetSpace</span>
-            <span className="text-sm text-muted-foreground">Room Manager</span>
-          </div>
+        <div className="flex items-center justify-center mb-8">
+          <img src={logoImage} alt="MeetSpace Manager" className="h-16 object-contain" data-testid="img-auth-logo" />
         </div>
 
         <Card>
