@@ -19,6 +19,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules/connect-pg-simple/table.sql ./dist/table.sql
 COPY tsconfig.json ./
 COPY drizzle.config.ts ./
 COPY shared ./shared
