@@ -1,24 +1,52 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth";
 import { Link } from "wouter";
 import {
-  Building2,
   DoorOpen,
   CalendarPlus,
+  CalendarIcon,
   Users,
   Monitor,
   Phone,
   Presentation,
   Wifi,
+  Clock,
 } from "lucide-react";
 import { formatTime, getTimezoneAbbr } from "@/lib/constants";
+import { format } from "date-fns";
 import type { Facility, RoomWithFacility, BookingWithDetails } from "@shared/schema";
 
 const equipmentIcons: Record<string, React.ReactNode> = {
@@ -28,7 +56,244 @@ const equipmentIcons: Record<string, React.ReactNode> = {
   "Projector": <Presentation className="w-3.5 h-3.5" />,
 };
 
+const timeSlots = Array.from({ length: 28 }, (_, i) => {
+  const hour = Math.floor(i / 2) + 7;
+  const min = i % 2 === 0 ? "00" : "30";
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+  return {
+    value: `${hour.toString().padStart(2, "0")}:${min}`,
+    label: `${displayHour}:${min} ${ampm}`,
+  };
+});
+
+const quickBookSchema = z.object({
+  title: z.string().min(1, "Meeting title is required").max(100),
+  date: z.date({ required_error: "Please select a date" }),
+  startTime: z.string().min(1, "Start time is required"),
+  endTime: z.string().min(1, "End time is required"),
+  meetingType: z.string().default("none"),
+  attendees: z.string().optional(),
+});
+
+type QuickBookValues = z.infer<typeof quickBookSchema>;
+
+function QuickBookDialog({
+  room,
+  open,
+  onOpenChange,
+}: {
+  room: RoomWithFacility;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+
+  const form = useForm<QuickBookValues>({
+    resolver: zodResolver(quickBookSchema),
+    defaultValues: {
+      title: "",
+      date: new Date(),
+      startTime: "",
+      endTime: "",
+      meetingType: "none",
+      attendees: "",
+    },
+  });
+
+  const createBooking = useMutation({
+    mutationFn: async (values: QuickBookValues) => {
+      const dateStr = format(values.date, "yyyy-MM-dd");
+      const startTime = new Date(`${dateStr}T${values.startTime}:00`);
+      const endTime = new Date(`${dateStr}T${values.endTime}:00`);
+
+      if (endTime <= startTime) {
+        throw new Error("End time must be after start time");
+      }
+
+      const attendeesArr = values.attendees
+        ? values.attendees.split(",").map((a) => a.trim()).filter(Boolean)
+        : [];
+
+      const body: Record<string, any> = {
+        roomId: room.id,
+        title: values.title,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        meetingType: values.meetingType,
+        attendees: attendeesArr.length > 0 ? attendeesArr : undefined,
+        isRecurring: false,
+      };
+
+      const res = await apiRequest("POST", "/api/bookings", body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings/today"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings/range"] });
+      toast({ title: "Room booked successfully", description: `${room.name} has been reserved.` });
+      onOpenChange(false);
+      form.reset();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Booking failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Book {room.name}</DialogTitle>
+          <DialogDescription>
+            {room.facility.name} — Capacity: {room.capacity}
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit((v) => createBooking.mutate(v))} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Meeting Title</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Weekly Team Standup" {...field} data-testid="input-quick-title" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Date</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button variant="outline" className="justify-start text-left font-normal" data-testid="button-quick-date">
+                          <CalendarIcon className="mr-2 w-4 h-4" />
+                          {field.value ? format(field.value, "PPP") : "Pick a date"}
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="startTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-quick-start">
+                          <Clock className="w-4 h-4 mr-2" />
+                          <SelectValue placeholder="Start" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {timeSlots.map((slot) => (
+                          <SelectItem key={slot.value} value={slot.value}>{slot.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="endTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-quick-end">
+                          <Clock className="w-4 h-4 mr-2" />
+                          <SelectValue placeholder="End" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {timeSlots.map((slot) => (
+                          <SelectItem key={slot.value} value={slot.value}>{slot.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="meetingType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Meeting Platform</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-quick-meeting-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">No virtual meeting</SelectItem>
+                      <SelectItem value="teams">Microsoft Teams</SelectItem>
+                      <SelectItem value="zoom">Zoom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="attendees"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Attendees (comma-separated emails)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="john@company.com, jane@company.com"
+                      {...field}
+                      data-testid="input-quick-attendees"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" className="w-full" disabled={createBooking.isPending} data-testid="button-quick-submit">
+              <CalendarPlus className="w-4 h-4 mr-2" />
+              {createBooking.isPending ? "Booking..." : "Book Room"}
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function RoomAvailabilityCard({ room, bookings }: { room: RoomWithFacility; bookings: BookingWithDetails[] }) {
+  const [bookDialogOpen, setBookDialogOpen] = useState(false);
+  const { user } = useAuth();
   const now = new Date();
   const currentBooking = bookings.find(
     (b) => b.roomId === room.id && b.status === "confirmed" && new Date(b.startTime) <= now && new Date(b.endTime) > now
@@ -39,64 +304,79 @@ function RoomAvailabilityCard({ room, bookings }: { room: RoomWithFacility; book
   const isAvailable = !currentBooking;
 
   return (
-    <Card className="hover-elevate" data-testid={`room-card-${room.id}`}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="min-w-0 flex-1">
-            <h3 className="font-medium text-sm truncate">{room.name}</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {room.facility.name} {room.floor ? `- ${room.floor}` : ""}
-            </p>
+    <>
+      <Card className="hover-elevate" data-testid={`room-card-${room.id}`}>
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-medium text-sm truncate">{room.name}</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {room.facility.name} {room.floor ? `- ${room.floor}` : ""}
+              </p>
+            </div>
+            <StatusBadge status={isAvailable ? "available" : "occupied"} />
           </div>
-          <StatusBadge status={isAvailable ? "available" : "occupied"} />
-        </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
-          <span className="flex items-center gap-1">
-            <Users className="w-3.5 h-3.5" />
-            {room.capacity}
-          </span>
-          {room.equipment && room.equipment.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              {room.equipment.slice(0, 3).map((eq) => (
-                <span key={eq} title={eq}>
-                  {equipmentIcons[eq] || <Monitor className="w-3.5 h-3.5" />}
-                </span>
-              ))}
-              {room.equipment.length > 3 && (
-                <span className="text-muted-foreground">+{room.equipment.length - 3}</span>
-              )}
+          <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
+            <span className="flex items-center gap-1">
+              <Users className="w-3.5 h-3.5" />
+              {room.capacity}
+            </span>
+            {room.equipment && room.equipment.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                {room.equipment.slice(0, 3).map((eq) => (
+                  <span key={eq} title={eq}>
+                    {equipmentIcons[eq] || <Monitor className="w-3.5 h-3.5" />}
+                  </span>
+                ))}
+                {room.equipment.length > 3 && (
+                  <span className="text-muted-foreground">+{room.equipment.length - 3}</span>
+                )}
+              </div>
+            )}
+          </div>
+          {currentBooking ? (
+            <div className="rounded-md bg-destructive/10 p-2.5 text-xs">
+              <p className="font-medium text-destructive">{currentBooking.title}</p>
+              <p className="text-muted-foreground mt-0.5">
+                Until {formatTime(currentBooking.endTime)}
+              </p>
+            </div>
+          ) : nextBooking ? (
+            <div className="rounded-md bg-muted p-2.5 text-xs">
+              <p className="font-medium">Next: {nextBooking.title}</p>
+              <p className="text-muted-foreground mt-0.5">
+                {formatTime(nextBooking.startTime)} - {formatTime(nextBooking.endTime)}
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-md bg-muted p-2.5 text-xs">
+              <p className="text-muted-foreground">No upcoming bookings</p>
             </div>
           )}
-        </div>
-        {currentBooking ? (
-          <div className="rounded-md bg-destructive/10 p-2.5 text-xs">
-            <p className="font-medium text-destructive">{currentBooking.title}</p>
-            <p className="text-muted-foreground mt-0.5">
-              Until {formatTime(currentBooking.endTime)}
-            </p>
-          </div>
-        ) : nextBooking ? (
-          <div className="rounded-md bg-muted p-2.5 text-xs">
-            <p className="font-medium">Next: {nextBooking.title}</p>
-            <p className="text-muted-foreground mt-0.5">
-              {formatTime(nextBooking.startTime)} - {formatTime(nextBooking.endTime)}
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-md bg-muted p-2.5 text-xs">
-            <p className="text-muted-foreground">No upcoming bookings</p>
-          </div>
-        )}
-        {isAvailable && (
-          <Link href={`/book?room=${room.id}`}>
-            <Button variant="outline" size="sm" className="w-full mt-3" data-testid={`button-book-${room.id}`}>
+          {isAvailable && user && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mt-3"
+              data-testid={`button-book-${room.id}`}
+              onClick={() => setBookDialogOpen(true)}
+            >
               <CalendarPlus className="w-3.5 h-3.5 mr-1.5" />
               Book Now
             </Button>
-          </Link>
-        )}
-      </CardContent>
-    </Card>
+          )}
+          {isAvailable && !user && (
+            <Link href={`/book?room=${room.id}`}>
+              <Button variant="outline" size="sm" className="w-full mt-3" data-testid={`button-book-${room.id}`}>
+                <CalendarPlus className="w-3.5 h-3.5 mr-1.5" />
+                Book Now
+              </Button>
+            </Link>
+          )}
+        </CardContent>
+      </Card>
+      {user && <QuickBookDialog room={room} open={bookDialogOpen} onOpenChange={setBookDialogOpen} />}
+    </>
   );
 }
 
