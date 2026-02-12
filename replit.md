@@ -127,9 +127,15 @@ All routes prefixed with `/api/`:
   - **Service module**: `server/webhooks.ts` - subscription lifecycle, notification processing, renewal scheduler
   - **Database table**: `graph_subscriptions` - tracks subscription ID, room, expiration, status, errors
   - **Admin UI**: `/admin/webhooks` page shows subscription status, allows subscribe all/remove/refresh
-- **Self-hosted Ubuntu deployment**:
+- **Self-hosted Ubuntu deployment** (see `deploy/` directory):
+  - Docker-based: `deploy/install.sh` installs Docker, Nginx, Certbot, builds and starts everything
+  - `deploy/docker-compose.yml` runs PostgreSQL 16 + app containers
+  - `deploy/.env.example` — copy to `.env` and configure before first run
+  - `deploy/update.sh` — pulls latest code, rebuilds, restarts
+  - `deploy/nginx.conf` — Nginx reverse proxy config with SSL and WebSocket support
+  - Production seed (`server/seed-production.ts`) creates only admin account (no demo data)
+  - ADMIN_PASSWORD is required (no default) for production security
   - Set `WEBHOOK_BASE_URL` to the public HTTPS URL (e.g., `https://meetspace.yourcompany.com`)
-  - Use Nginx reverse proxy with Let's Encrypt SSL for HTTPS
   - Webhook endpoint must be accessible at `{WEBHOOK_BASE_URL}/api/graph/webhook`
   - Subscriptions auto-recover if server restarts (re-subscribes on startup)
 - **API routes** (admin only):

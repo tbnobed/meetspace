@@ -105,11 +105,20 @@ app.use((req, res, next) => {
     }
   }
 
-  const { seedDatabase } = await import("./seed");
-  try {
-    await seedDatabase();
-  } catch (e) {
-    console.error("Failed to seed database:", e);
+  if (process.env.NODE_ENV === "production") {
+    const { seedProductionDatabase } = await import("./seed-production");
+    try {
+      await seedProductionDatabase();
+    } catch (e) {
+      console.error("Failed to seed production database:", e);
+    }
+  } else {
+    const { seedDatabase } = await import("./seed");
+    try {
+      await seedDatabase();
+    } catch (e) {
+      console.error("Failed to seed database:", e);
+    }
   }
 
   await registerRoutes(httpServer, app);

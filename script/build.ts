@@ -5,8 +5,11 @@ import { rm, readFile } from "fs/promises";
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
 const allowlist = [
+  "@azure/msal-node",
   "@google/generative-ai",
+  "@sendgrid/mail",
   "axios",
+  "bcryptjs",
   "connect-pg-simple",
   "cors",
   "date-fns",
@@ -24,6 +27,7 @@ const allowlist = [
   "passport",
   "passport-local",
   "pg",
+  "socket.io",
   "stripe",
   "uuid",
   "ws",
