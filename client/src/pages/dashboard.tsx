@@ -56,6 +56,64 @@ function getMeetingTypeIcon(meetingType: string | null) {
   return null;
 }
 
+function computeOverlapLayout(bookings: BookingWithDetails[]): Map<string, { col: number; totalCols: number }> {
+  const result = new Map<string, { col: number; totalCols: number }>();
+  if (bookings.length === 0) return result;
+
+  const sorted = [...bookings].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+  const groups: BookingWithDetails[][] = [];
+  for (const b of sorted) {
+    const bStart = new Date(b.startTime).getTime();
+    const bEnd = new Date(b.endTime).getTime();
+    let placed = false;
+    for (const group of groups) {
+      const overlaps = group.some((g) => {
+        const gStart = new Date(g.startTime).getTime();
+        const gEnd = new Date(g.endTime).getTime();
+        return bStart < gEnd && bEnd > gStart;
+      });
+      if (overlaps) {
+        group.push(b);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      groups.push([b]);
+    }
+  }
+
+  for (const group of groups) {
+    const columns: BookingWithDetails[][] = [];
+    const groupSorted = [...group].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    for (const b of groupSorted) {
+      const bStart = new Date(b.startTime).getTime();
+      let placedInCol = false;
+      for (let ci = 0; ci < columns.length; ci++) {
+        const lastInCol = columns[ci][columns[ci].length - 1];
+        if (new Date(lastInCol.endTime).getTime() <= bStart) {
+          columns[ci].push(b);
+          result.set(b.id, { col: ci, totalCols: 0 });
+          placedInCol = true;
+          break;
+        }
+      }
+      if (!placedInCol) {
+        result.set(b.id, { col: columns.length, totalCols: 0 });
+        columns.push([b]);
+      }
+    }
+    const totalCols = columns.length;
+    for (const b of group) {
+      const entry = result.get(b.id);
+      if (entry) entry.totalCols = totalCols;
+    }
+  }
+
+  return result;
+}
+
 const BOOKING_COLORS = [
   "bg-blue-500/15 border-blue-500/30 text-blue-700 dark:text-blue-300",
   "bg-violet-500/15 border-violet-500/30 text-violet-700 dark:text-violet-300",
@@ -345,6 +403,7 @@ function WeekView({
             </div>
             {weekDates.map((day, di) => {
               const dayBookings = getBookingsForDay(filtered, day);
+              const layoutMap = computeOverlapLayout(dayBookings);
 
               const startingThisHour = dayBookings.filter((b) => {
                 return getLocalHour(b.startTime) === hour;
@@ -360,13 +419,21 @@ function WeekView({
                     const durationMins = (endH * 60 + endM) - (startH * 60 + startM);
                     const heightPx = Math.max(20, (durationMins / 60) * 48 - 2);
                     const topPx = (startM / 60) * 48;
+                    const layout = layoutMap.get(b.id) || { col: 0, totalCols: 1 };
+                    const widthPct = 100 / layout.totalCols;
+                    const leftPct = layout.col * widthPct;
 
                     return (
                       <Tooltip key={b.id}>
                         <TooltipTrigger asChild>
                           <div
-                            className={`absolute left-0.5 right-0.5 rounded border px-1 py-0.5 text-[11px] leading-tight overflow-hidden cursor-default z-10 ${getBookingColor(b.roomId)}`}
-                            style={{ top: `${topPx}px`, height: `${heightPx}px` }}
+                            className={`absolute rounded border px-1 py-0.5 text-[11px] leading-tight overflow-hidden cursor-default z-10 ${getBookingColor(b.roomId)}`}
+                            style={{
+                              top: `${topPx}px`,
+                              height: `${heightPx}px`,
+                              left: `calc(${leftPct}% + 2px)`,
+                              width: `calc(${widthPct}% - 4px)`,
+                            }}
                             data-testid={`week-booking-${b.id}`}
                           >
                             <div className="font-medium truncate">{b.title}</div>
