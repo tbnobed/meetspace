@@ -1,0 +1,133 @@
+ ✔ Network deploy_default Removed                                                                                                                                            0.2s
+obtv-admin@meetspace:~/meetspace/deploy$ git pull
+remote: Enumerating objects: 10, done.
+remote: Counting objects: 100% (10/10), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 6 (delta 4), reused 6 (delta 4), pack-reused 0 (from 0)
+Unpacking objects: 100% (6/6), 3.51 KiB | 898.00 KiB/s, done.
+From https://github.com/tbnobed/meetspace
+   3b1b3b9..03036c1  main       -> origin/main
+Updating 3b1b3b9..03036c1
+Fast-forward
+ attached_assets/Pasted-obtv-admin-meetspace-meetspace-deploy-git-pull-remote-E_1770934981435.txt | 132 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ deploy/Dockerfile                                                                                |   4 +--
+ 2 files changed, 133 insertions(+), 3 deletions(-)
+ create mode 100644 attached_assets/Pasted-obtv-admin-meetspace-meetspace-deploy-git-pull-remote-E_1770934981435.txt
+obtv-admin@meetspace:~/meetspace/deploy$ sudo docker compose build --no-cache
+[+] Building 41.8s (20/20) FINISHED
+ => [internal] load local bake definitions                                                                                                                                  0.0s
+ => => reading from stdin 521B                                                                                                                                              0.0s
+ => [internal] load build definition from Dockerfile                                                                                                                        0.0s
+ => => transferring dockerfile: 579B                                                                                                                                        0.0s
+ => [internal] load metadata for docker.io/library/node:20-alpine                                                                                                           0.3s
+ => [internal] load .dockerignore                                                                                                                                           0.0s
+ => => transferring context: 2B                                                                                                                                             0.0s
+ => [internal] load build context                                                                                                                                           0.0s
+ => => transferring context: 42.70kB                                                                                                                                        0.0s
+ => [builder 1/6] FROM docker.io/library/node:20-alpine@sha256:09e2b3d9726018aecf269bd35325f46bf75046a643a66d28360ec71132750ec8                                             0.0s
+ => => resolve docker.io/library/node:20-alpine@sha256:09e2b3d9726018aecf269bd35325f46bf75046a643a66d28360ec71132750ec8                                                     0.0s
+ => CACHED [builder 2/6] WORKDIR /app                                                                                                                                       0.0s
+ => [builder 3/6] COPY package.json package-lock.json* ./                                                                                                                   0.0s
+ => [runner  4/10] RUN npm ci && npm cache clean --force                                                                                                                   10.5s
+ => [builder 4/6] RUN npm ci                                                                                                                                               11.0s
+ => [builder 5/6] COPY . .                                                                                                                                                  0.3s
+ => [builder 6/6] RUN npm run build                                                                                                                                         9.3s
+ => [runner  5/10] COPY --from=builder /app/dist ./dist                                                                                                                     0.2s
+ => [runner  6/10] COPY tsconfig.json ./                                                                                                                                    0.0s
+ => [runner  7/10] COPY drizzle.config.ts ./                                                                                                                                0.0s
+ => [runner  8/10] COPY shared ./shared                                                                                                                                     0.0s
+ => [runner  9/10] COPY deploy/docker-entrypoint.sh ./docker-entrypoint.sh                                                                                                  0.0s
+ => [runner 10/10] RUN chmod +x ./docker-entrypoint.sh                                                                                                                      0.2s
+ => exporting to image                                                                                                                                                     19.5s
+ => => exporting layers                                                                                                                                                    12.8s
+ => => exporting manifest sha256:521842d4ce6a891f2700d102de41f03761ac7a93a30ef7549cf0e7c0213a89ac                                                                           0.0s
+ => => exporting config sha256:4b708d36c1612b8429fca9b15a4f13be6ca85c7888be58f42642d5a138f8d0c3                                                                             0.0s
+ => => exporting attestation manifest sha256:2f03a85032bc84c801631e84ac1344d93eab0420dc7992f9b35763495680006a                                                               0.0s
+ => => exporting manifest list sha256:f739792e077c4762623aff04a00fc5faca40c65a4a4eea11962f67b7437ae808                                                                      0.0s
+ => => naming to docker.io/library/deploy-app:latest                                                                                                                        0.0s
+ => => unpacking to docker.io/library/deploy-app:latest                                                                                                                     6.6s
+ => resolving provenance for metadata file                                                                                                                                  0.0s
+[+] build 1/1
+ ✔ Image deploy-app Built                                                                                                                                                   41.9s
+obtv-admin@meetspace:~/meetspace/deploy$ sudo docker compose up -d
+[+] up 4/4
+ ✔ Network deploy_default Created                                                                                                                                            0.0s
+ ✔ Volume deploy_pgdata   Created                                                                                                                                            0.0s
+ ✔ Container deploy-db-1  Healthy                                                                                                                                            6.2s
+ ✔ Container deploy-app-1 Created                                                                                                                                            0.1s
+obtv-admin@meetspace:~/meetspace/deploy$ sudo docker compose logs -f
+db-1   | The files belonging to this database system will be owned by user "postgres".
+db-1   | This user must also own the server process.
+db-1   |
+db-1   | The database cluster will be initialized with locale "en_US.utf8".
+app-1  | Running database schema migration...
+app-1  | ./docker-entrypoint.sh: line 5: ./node_modules/.bin/drizzle-kit: not found
+app-1  | Running database schema migration...
+app-1  | ./docker-entrypoint.sh: line 5: ./node_modules/.bin/drizzle-kit: not found
+app-1  | Running database schema migration...
+app-1  | ./docker-entrypoint.sh: line 5: ./node_modules/.bin/drizzle-kit: not found
+app-1  | Running database schema migration...
+app-1  | ./docker-entrypoint.sh: line 5: ./node_modules/.bin/drizzle-kit: not found
+app-1  | Running database schema migration...
+app-1  | ./docker-entrypoint.sh: line 5: ./node_modules/.bin/drizzle-kit: not found
+db-1   | The default database encoding has accordingly been set to "UTF8".
+db-1   | The default text search configuration will be set to "english".
+db-1   |
+db-1   | Data page checksums are disabled.
+db-1   |
+db-1   | fixing permissions on existing directory /var/lib/postgresql/data ... ok
+db-1   | creating subdirectories ... ok
+db-1   | selecting dynamic shared memory implementation ... posix
+db-1   | selecting default max_connections ... 100
+db-1   | selecting default shared_buffers ... 128MB
+db-1   | selecting default time zone ... UTC
+db-1   | creating configuration files ... ok
+db-1   | running bootstrap script ... ok
+db-1   | sh: locale: not found
+db-1   | 2026-02-12 22:24:54.719 UTC [35] WARNING:  no usable system locales were found
+db-1   | performing post-bootstrap initialization ... ok
+db-1   | syncing data to disk ... ok
+db-1   |
+db-1   |
+db-1   | Success. You can now start the database server using:
+db-1   |
+db-1   | initdb: warning: enabling "trust" authentication for local connections
+db-1   | initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+db-1   |     pg_ctl -D /var/lib/postgresql/data -l logfile start
+db-1   |
+db-1   | waiting for server to start....2026-02-12 22:24:55.329 UTC [41] LOG:  starting PostgreSQL 16.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+db-1   | 2026-02-12 22:24:55.331 UTC [41] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+db-1   | 2026-02-12 22:24:55.335 UTC [44] LOG:  database system was shut down at 2026-02-12 22:24:55 UTC
+db-1   | 2026-02-12 22:24:55.345 UTC [41] LOG:  database system is ready to accept connections
+db-1   |  done
+db-1   | server started
+db-1   | CREATE DATABASE
+db-1   |
+db-1   |
+db-1   | /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+db-1   |
+db-1   | waiting for server to shut down....2026-02-12 22:24:55.500 UTC [41] LOG:  received fast shutdown request
+db-1   | 2026-02-12 22:24:55.502 UTC [41] LOG:  aborting any active transactions
+db-1   | 2026-02-12 22:24:55.505 UTC [41] LOG:  background worker "logical replication launcher" (PID 47) exited with exit code 1
+db-1   | 2026-02-12 22:24:55.508 UTC [42] LOG:  shutting down
+db-1   | 2026-02-12 22:24:55.509 UTC [42] LOG:  checkpoint starting: shutdown immediate
+db-1   | 2026-02-12 22:24:55.552 UTC [42] LOG:  checkpoint complete: wrote 926 buffers (5.7%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.024 s, sync=0.016 s, total=0.044 s; sync files=301, longest=0.002 s, average=0.001 s; distance=4272 kB, estimate=4272 kB; lsn=0/191E928, redo lsn=0/191E928
+db-1   | 2026-02-12 22:24:55.563 UTC [41] LOG:  database system is shut down
+db-1   |  done
+db-1   | server stopped
+db-1   |
+db-1   | PostgreSQL init process complete; ready for start up.
+db-1   |
+db-1   | 2026-02-12 22:24:55.644 UTC [1] LOG:  starting PostgreSQL 16.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+db-1   | 2026-02-12 22:24:55.644 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+db-1   | 2026-02-12 22:24:55.644 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+db-1   | 2026-02-12 22:24:55.646 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+db-1   | 2026-02-12 22:24:55.650 UTC [57] LOG:  database system was shut down at 2026-02-12 22:24:55 UTC
+db-1   | 2026-02-12 22:24:55.660 UTC [1] LOG:  database system is ready to accept connections
+app-1  | Running database schema migration...
+app-1  | ./docker-entrypoint.sh: line 5: ./node_modules/.bin/drizzle-kit: not found
+app-1 exited with code 127 (restarting)
+app-1  | Running database schema migration...
+app-1  | ./docker-entrypoint.sh: line 5: ./node_modules/.bin/drizzle-kit: not found
+app-1 exited with code 127 (restarting)
+app-1  | Running database schema migration

@@ -13,7 +13,6 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-ENV NODE_ENV=production
 ENV PORT=5000
 
 COPY package.json package-lock.json* ./
@@ -25,6 +24,8 @@ COPY drizzle.config.ts ./
 COPY shared ./shared
 COPY deploy/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
+
+ENV NODE_ENV=production
 
 EXPOSE 5000
 
