@@ -41,7 +41,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <img src={sidebarLogo} alt="MeetSpace" className="h-10 object-contain" data-testid="img-sidebar-logo" />
+        <img src={sidebarLogo} alt="MeetSpace" className="h-20 object-contain" data-testid="img-sidebar-logo" />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
