@@ -527,6 +527,29 @@ export async function registerRoutes(
     res.json(facility);
   });
 
+  app.delete("/api/facilities/:id", requireAdmin, async (req, res) => {
+    try {
+      const facility = await storage.getFacility(req.params.id as string);
+      if (!facility) return res.status(404).json({ message: "Facility not found" });
+      const deleted = await storage.deleteFacility(req.params.id as string);
+      if (!deleted) return res.status(404).json({ message: "Facility not found" });
+      await storage.createAuditLog({
+        userId: req.session.userId as string,
+        action: "facility_deleted",
+        entityType: "facility",
+        entityId: req.params.id as string,
+        details: `Deleted facility: ${facility.name}`,
+      });
+      io.emit("facilities:updated");
+      res.json({ message: "Facility deleted" });
+    } catch (error: any) {
+      if (error.code === "23503") {
+        return res.status(400).json({ message: "Cannot delete facility: it has rooms or bookings associated with it. Remove those first." });
+      }
+      throw error;
+    }
+  });
+
   app.post("/api/rooms", requireAdmin, async (req, res) => {
     const parsed = insertRoomSchema.safeParse(req.body);
     if (!parsed.success) {

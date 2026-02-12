@@ -19,6 +19,7 @@ export interface IStorage {
   getFacility(id: string): Promise<Facility | undefined>;
   createFacility(data: InsertFacility): Promise<Facility>;
   updateFacility(id: string, data: Partial<InsertFacility>): Promise<Facility | undefined>;
+  deleteFacility(id: string): Promise<boolean>;
 
   // Rooms
   getRooms(): Promise<RoomWithFacility[]>;
@@ -99,6 +100,11 @@ export class DatabaseStorage implements IStorage {
   async updateFacility(id: string, data: Partial<InsertFacility>): Promise<Facility | undefined> {
     const [result] = await db.update(facilities).set(data).where(eq(facilities.id, id)).returning();
     return result;
+  }
+
+  async deleteFacility(id: string): Promise<boolean> {
+    const [result] = await db.delete(facilities).where(eq(facilities.id, id)).returning();
+    return !!result;
   }
 
   // Rooms

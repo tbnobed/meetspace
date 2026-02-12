@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,13 +15,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getTimezoneAbbr } from "@/lib/constants";
-import { Plus, Building2, MapPin, Clock, Pencil } from "lucide-react";
+import { Plus, Building2, MapPin, Clock, Pencil, Trash2 } from "lucide-react";
 import type { Facility } from "@shared/schema";
 
 const TIMEZONE_OPTIONS = [
@@ -51,12 +61,30 @@ function FacilityFormDialog({ facility, open, onOpenChange }: {
   const form = useForm<FacilityFormValues>({
     resolver: zodResolver(facilityFormSchema),
     defaultValues: {
-      name: facility?.name || "",
-      location: facility?.location || "",
-      timezone: facility?.timezone || "",
-      isActive: facility?.isActive ?? true,
+      name: "",
+      location: "",
+      timezone: "",
+      isActive: true,
     },
   });
+
+  useEffect(() => {
+    if (open && facility) {
+      form.reset({
+        name: facility.name,
+        location: facility.location,
+        timezone: facility.timezone,
+        isActive: facility.isActive ?? true,
+      });
+    } else if (open && !facility) {
+      form.reset({
+        name: "",
+        location: "",
+        timezone: "",
+        isActive: true,
+      });
+    }
+  }, [open, facility]);
 
   const mutation = useMutation({
     mutationFn: async (values: FacilityFormValues) => {
@@ -145,8 +173,25 @@ function FacilityFormDialog({ facility, open, onOpenChange }: {
 export default function AdminFacilities() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editFacility, setEditFacility] = useState<Facility | undefined>();
+  const [deleteFacility, setDeleteFacility] = useState<Facility | undefined>();
+  const { toast } = useToast();
 
   const { data: facilities, isLoading } = useQuery<Facility[]>({ queryKey: ["/api/facilities"] });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/facilities/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/facilities"] });
+      toast({ title: "Facility deleted" });
+      setDeleteFacility(undefined);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      setDeleteFacility(undefined);
+    },
+  });
 
   const handleEdit = (facility: Facility) => {
     setEditFacility(facility);
@@ -190,7 +235,7 @@ export default function AdminFacilities() {
                   <TableHead>Location</TableHead>
                   <TableHead>Timezone</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-12"></TableHead>
+                  <TableHead className="w-24"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -220,9 +265,14 @@ export default function AdminFacilities() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button size="icon" variant="ghost" onClick={() => handleEdit(facility)} data-testid={`button-edit-facility-${facility.id}`}>
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => handleEdit(facility)} data-testid={`button-edit-facility-${facility.id}`}>
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => setDeleteFacility(facility)} data-testid={`button-delete-facility-${facility.id}`}>
+                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -248,6 +298,27 @@ export default function AdminFacilities() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
       />
+
+      <AlertDialog open={!!deleteFacility} onOpenChange={(open) => !open && setDeleteFacility(undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Facility</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteFacility?.name}"? This action cannot be undone. If the facility has rooms or bookings, you'll need to remove those first.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteFacility && deleteMutation.mutate(deleteFacility.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
