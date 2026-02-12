@@ -20,7 +20,7 @@ import {
   Monitor,
   Video,
 } from "lucide-react";
-import { formatTimeInZone, getTimezoneAbbr } from "@/lib/constants";
+import { formatTime, getBrowserTimezoneAbbr } from "@/lib/constants";
 import type { Facility, RoomWithFacility, BookingWithDetails } from "@shared/schema";
 
 type ViewMode = "month" | "week" | "day";
@@ -32,23 +32,22 @@ function computeHours(bookings: BookingWithDetails[]): number[] {
   let minHour = DEFAULT_START_HOUR;
   let maxHour = DEFAULT_END_HOUR;
   for (const b of bookings) {
-    const tz = b.facility.timezone;
-    const startH = getHourInZone(b.startTime, tz);
-    const endH = getHourInZone(b.endTime, tz);
+    const startH = getLocalHour(b.startTime);
+    const endH = getLocalHour(b.endTime);
     if (startH < minHour) minHour = startH;
     if (endH > maxHour) maxHour = endH;
   }
   return Array.from({ length: maxHour - minHour + 1 }, (_, i) => i + minHour);
 }
 
-function getHourInZone(date: Date | string, timezone: string): number {
+function getLocalHour(date: Date | string): number {
   const d = typeof date === "string" ? new Date(date) : date;
-  return parseInt(d.toLocaleString("en-US", { hour: "numeric", hour12: false, timeZone: timezone }));
+  return d.getHours();
 }
 
-function getMinuteInZone(date: Date | string, timezone: string): number {
+function getLocalMinute(date: Date | string): number {
   const d = typeof date === "string" ? new Date(date) : date;
-  return parseInt(d.toLocaleString("en-US", { minute: "numeric", timeZone: timezone }));
+  return d.getMinutes();
 }
 
 function getMeetingTypeIcon(meetingType: string | null) {
@@ -181,8 +180,8 @@ function BookingTooltipContent({ booking }: { booking: BookingWithDetails }) {
       <div className="flex items-center gap-1.5 text-xs">
         <Clock className="w-3 h-3 flex-shrink-0" />
         <span>
-          {formatTimeInZone(booking.startTime, booking.facility.timezone)} - {formatTimeInZone(booking.endTime, booking.facility.timezone)}
-          {" "}({getTimezoneAbbr(booking.facility.timezone)})
+          {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+          {" "}({getBrowserTimezoneAbbr()})
         </span>
       </div>
       <div className="flex items-center gap-1.5 text-xs">
@@ -271,7 +270,7 @@ function MonthView({
                           className={`text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate ${getBookingColor(b.roomId)}`}
                           data-testid={`month-booking-${b.id}`}
                         >
-                          {formatTimeInZone(b.startTime, b.facility.timezone).replace(/:00/g, "")} {b.title}
+                          {formatTime(b.startTime).replace(/:00/g, "")} {b.title}
                         </div>
                       </TooltipTrigger>
                       <TooltipContent side="right" align="start">
@@ -348,18 +347,16 @@ function WeekView({
               const dayBookings = getBookingsForDay(filtered, day);
 
               const startingThisHour = dayBookings.filter((b) => {
-                const tz = b.facility.timezone;
-                return getHourInZone(b.startTime, tz) === hour;
+                return getLocalHour(b.startTime) === hour;
               });
 
               return (
                 <div key={di} className="border-l min-h-[48px] p-0.5 relative">
                   {startingThisHour.map((b) => {
-                    const tz = b.facility.timezone;
-                    const startH = getHourInZone(b.startTime, tz);
-                    const startM = getMinuteInZone(b.startTime, tz);
-                    const endH = getHourInZone(b.endTime, tz);
-                    const endM = getMinuteInZone(b.endTime, tz);
+                    const startH = getLocalHour(b.startTime);
+                    const startM = getLocalMinute(b.startTime);
+                    const endH = getLocalHour(b.endTime);
+                    const endM = getLocalMinute(b.endTime);
                     const durationMins = (endH * 60 + endM) - (startH * 60 + startM);
                     const heightPx = Math.max(20, (durationMins / 60) * 48 - 2);
                     const topPx = (startM / 60) * 48;
@@ -430,8 +427,7 @@ function DayView({
       <div className="overflow-y-auto max-h-[600px]">
         {hours.map((hour) => {
           const hourBookings = dayBookings.filter((b) => {
-            const tz = b.facility.timezone;
-            return getHourInZone(b.startTime, tz) === hour;
+            return getLocalHour(b.startTime) === hour;
           });
 
           return (
@@ -452,8 +448,8 @@ function DayView({
                         <div className="flex items-center gap-3 mt-1 text-xs opacity-80 flex-wrap">
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3 flex-shrink-0" />
-                            {formatTimeInZone(b.startTime, b.facility.timezone)} - {formatTimeInZone(b.endTime, b.facility.timezone)}
-                            {" "}({getTimezoneAbbr(b.facility.timezone)})
+                            {formatTime(b.startTime)} - {formatTime(b.endTime)}
+                            {" "}({getBrowserTimezoneAbbr()})
                           </span>
                           <span className="flex items-center gap-1">
                             <MapPin className="w-3 h-3 flex-shrink-0" />

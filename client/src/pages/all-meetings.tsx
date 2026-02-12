@@ -18,7 +18,7 @@ import {
   Presentation,
   Wifi,
 } from "lucide-react";
-import { formatTimeInZone, getTimezoneAbbr } from "@/lib/constants";
+import { formatTime, getTimezoneAbbr } from "@/lib/constants";
 import type { Facility, RoomWithFacility, BookingWithDetails } from "@shared/schema";
 
 const equipmentIcons: Record<string, React.ReactNode> = {
@@ -72,14 +72,14 @@ function RoomAvailabilityCard({ room, bookings }: { room: RoomWithFacility; book
           <div className="rounded-md bg-destructive/10 p-2.5 text-xs">
             <p className="font-medium text-destructive">{currentBooking.title}</p>
             <p className="text-muted-foreground mt-0.5">
-              Until {formatTimeInZone(currentBooking.endTime, room.facility.timezone)}
+              Until {formatTime(currentBooking.endTime)}
             </p>
           </div>
         ) : nextBooking ? (
           <div className="rounded-md bg-muted p-2.5 text-xs">
             <p className="font-medium">Next: {nextBooking.title}</p>
             <p className="text-muted-foreground mt-0.5">
-              {formatTimeInZone(nextBooking.startTime, room.facility.timezone)} - {formatTimeInZone(nextBooking.endTime, room.facility.timezone)}
+              {formatTime(nextBooking.startTime)} - {formatTime(nextBooking.endTime)}
             </p>
           </div>
         ) : (

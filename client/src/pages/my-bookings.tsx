@@ -19,7 +19,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { formatTimeInZone, formatDateInZone, getTimezoneAbbr } from "@/lib/constants";
+import { formatTime, formatDate, getBrowserTimezoneAbbr } from "@/lib/constants";
 import { Link } from "wouter";
 import {
   CalendarPlus,
@@ -71,13 +71,13 @@ function BookingCard({ booking }: { booking: BookingWithDetails }) {
         <div className="space-y-1.5 text-xs text-muted-foreground mb-3">
           <div className="flex items-center gap-2">
             <CalendarDays className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>{formatDateInZone(booking.startTime, booking.facility.timezone)}</span>
+            <span>{formatDate(booking.startTime)}</span>
           </div>
           <div className="flex items-center gap-2">
             <Clock className="w-3.5 h-3.5 flex-shrink-0" />
             <span>
-              {formatTimeInZone(booking.startTime, booking.facility.timezone)} - {formatTimeInZone(booking.endTime, booking.facility.timezone)}
-              <span className="ml-1">({getTimezoneAbbr(booking.facility.timezone)})</span>
+              {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+              <span className="ml-1">({getBrowserTimezoneAbbr()})</span>
             </span>
           </div>
           <div className="flex items-center gap-2">
