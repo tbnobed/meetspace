@@ -33,6 +33,35 @@ export function getTimezoneAbbr(timezone: string): string {
   return FACILITY_TIMEZONES[timezone] || timezone;
 }
 
+export function getBrowserTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+export function getBrowserTimezoneAbbr(): string {
+  const tz = getBrowserTimezone();
+  if (FACILITY_TIMEZONES[tz]) return FACILITY_TIMEZONES[tz];
+  const abbr = new Date().toLocaleTimeString("en-US", { timeZoneName: "short", timeZone: tz }).split(" ").pop();
+  return abbr || tz;
+}
+
+export function formatTime(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+export function formatDate(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export function formatTimeInZone(date: Date | string, timezone: string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return d.toLocaleTimeString("en-US", {
