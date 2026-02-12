@@ -1,10 +1,12 @@
-#!/usr/bin/env sh
+#!/bin/sh
 set -e
 
 echo "Running database schema migration..."
-npx drizzle-kit push --force 2>&1 || {
-  echo "WARNING: drizzle-kit push failed — schema may need manual migration."
-}
+npx drizzle-kit push --force 2>&1
+if [ $? -ne 0 ]; then
+  echo "ERROR: drizzle-kit push failed. Cannot start without database schema."
+  exit 1
+fi
 
 echo "Ensuring site_admin role exists..."
 node -e "

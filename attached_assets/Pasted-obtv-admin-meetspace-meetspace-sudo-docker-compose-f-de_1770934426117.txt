@@ -1,0 +1,103 @@
+obtv-admin@meetspace:~/meetspace$ sudo docker compose -f deploy/docker-compose.yml logs -f
+WARN[0000] /home/obtv-admin/meetspace/deploy/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion
+app-1  | Running database schema migration...
+app-1  | No config path provided, using default 'drizzle.config.ts'
+app-1  | Reading config file '/app/drizzle.config.ts'
+app-1  | Cannot find module 'drizzle-kit'
+app-1  | Require stack:
+app-1  | - /app/drizzle.config.ts
+app-1  | - /usr/local/lib/node_modules/drizzle-kit/bin.cjs
+app-1  | WARNING: drizzle-kit push failed — schema may need manual migration.
+app-1  | Ensuring site_admin role exists...
+app-1  | site_admin check: type "user_role" does not exist
+app-1  | Starting MeetSpace Manager...
+app-1  | Failed to seed production database: error: relation "users" does not exist
+app-1  |     at /app/dist/index.cjs:58:13356
+app-1  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+app-1  |     at async /app/dist/index.cjs:78:37980
+app-1  |     at async l1e (/app/dist/index.cjs:93:51097)
+db-1   | The files belonging to this database system will be owned by user "postgres".
+db-1   | This user must also own the server process.
+db-1   |
+db-1   | The database cluster will be initialized with locale "en_US.utf8".
+db-1   | The default database encoding has accordingly been set to "UTF8".
+app-1  |     at async /app/dist/index.cjs:214:32858 {
+app-1  |   length: 105,
+app-1  |   severity: 'ERROR',
+app-1  |   code: '42P01',
+app-1  |   detail: undefined,
+app-1  |   hint: undefined,
+app-1  |   position: '102',
+app-1  |   internalPosition: undefined,
+app-1  |   internalQuery: undefined,
+app-1  |   where: undefined,
+app-1  |   schema: undefined,
+app-1  |   table: undefined,
+app-1  |   column: undefined,
+app-1  |   dataType: undefined,
+app-1  |   constraint: undefined,
+app-1  |   file: 'parse_relation.c',
+app-1  |   line: '1449',
+app-1  |   routine: 'parserOpenTable'
+app-1  | }
+app-1  | 10:12:27 PM [express] serving on port 5000
+app-1  | Failed to initialize Graph webhooks: relation "rooms" does not exist
+db-1   | The default text search configuration will be set to "english".
+db-1   |
+db-1   | Data page checksums are disabled.
+db-1   |
+db-1   | fixing permissions on existing directory /var/lib/postgresql/data ... ok
+db-1   | creating subdirectories ... ok
+db-1   | selecting dynamic shared memory implementation ... posix
+db-1   | selecting default max_connections ... 100
+db-1   | selecting default shared_buffers ... 128MB
+db-1   | selecting default time zone ... UTC
+db-1   | creating configuration files ... ok
+db-1   | running bootstrap script ... ok
+db-1   | sh: locale: not found
+db-1   | 2026-02-12 22:12:20.621 UTC [35] WARNING:  no usable system locales were found
+db-1   | performing post-bootstrap initialization ... ok
+db-1   | syncing data to disk ... ok
+db-1   |
+db-1   |
+db-1   | Success. You can now start the database server using:
+db-1   |
+db-1   |     pg_ctl -D /var/lib/postgresql/data -l logfile start
+db-1   |
+db-1   | initdb: warning: enabling "trust" authentication for local connections
+db-1   | initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+db-1   | waiting for server to start....2026-02-12 22:12:21.206 UTC [41] LOG:  starting PostgreSQL 16.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+db-1   | 2026-02-12 22:12:21.207 UTC [41] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+db-1   | 2026-02-12 22:12:21.212 UTC [44] LOG:  database system was shut down at 2026-02-12 22:12:21 UTC
+db-1   | 2026-02-12 22:12:21.217 UTC [41] LOG:  database system is ready to accept connections
+db-1   |  done
+db-1   | server started
+db-1   | CREATE DATABASE
+db-1   |
+db-1   |
+db-1   | /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+db-1   |
+db-1   | waiting for server to shut down...2026-02-12 22:12:21.380 UTC [41] LOG:  received fast shutdown request
+db-1   | .2026-02-12 22:12:21.381 UTC [41] LOG:  aborting any active transactions
+db-1   | 2026-02-12 22:12:21.387 UTC [41] LOG:  background worker "logical replication launcher" (PID 47) exited with exit code 1
+db-1   | 2026-02-12 22:12:21.388 UTC [42] LOG:  shutting down
+db-1   | 2026-02-12 22:12:21.389 UTC [42] LOG:  checkpoint starting: shutdown immediate
+db-1   | 2026-02-12 22:12:21.480 UTC [42] LOG:  checkpoint complete: wrote 926 buffers (5.7%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.066 s, sync=0.022 s, total=0.093 s; sync files=301, longest=0.002 s, average=0.001 s; distance=4272 kB, estimate=4272 kB; lsn=0/191E928, redo lsn=0/191E928
+db-1   | 2026-02-12 22:12:21.491 UTC [41] LOG:  database system is shut down
+db-1   |  done
+db-1   | server stopped
+db-1   |
+db-1   | PostgreSQL init process complete; ready for start up.
+db-1   |
+db-1   | 2026-02-12 22:12:21.614 UTC [1] LOG:  starting PostgreSQL 16.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+db-1   | 2026-02-12 22:12:21.614 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+db-1   | 2026-02-12 22:12:21.614 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+db-1   | 2026-02-12 22:12:21.616 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+db-1   | 2026-02-12 22:12:21.620 UTC [57] LOG:  database system was shut down at 2026-02-12 22:12:21 UTC
+db-1   | 2026-02-12 22:12:21.630 UTC [1] LOG:  database system is ready to accept connections
+db-1   | 2026-02-12 22:12:26.801 UTC [68] ERROR:  type "user_role" does not exist
+db-1   | 2026-02-12 22:12:26.801 UTC [68] STATEMENT:  ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'site_admin'
+db-1   | 2026-02-12 22:12:27.146 UTC [69] ERROR:  relation "users" does not exist at character 102
+db-1   | 2026-02-12 22:12:27.146 UTC [69] STATEMENT:  select "id", "username", "password", "display_name", "email", "role", "facility_id", "approved" from "users"
+db-1   | 2026-02-12 22:12:32.191 UTC [77] ERROR:  relation "rooms" does not exist at character 291
+db-1   | 2026-02-12 22:12:32.191 UTC [77] STATEMENT:  select "rooms"."id", "rooms"."facility_id", "rooms"."name", "rooms"."capacity", "rooms"."floor", "rooms"."equipment", "rooms"."is_active", "rooms"."ms_graph_room_email", "facilities"."id", "facilities"."name", "facilities"."location", "facilities"."timezone", "facilities"."is_active" from "rooms" inner join "facilities" on "rooms"."facility_id" = "facilities"."id" order by "rooms"."name"
