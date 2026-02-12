@@ -246,10 +246,6 @@ function BookingTooltipContent({ booking }: { booking: BookingWithDetails }) {
         <MapPin className="w-3 h-3 flex-shrink-0" />
         <span>{booking.room.name} - {booking.facility.name}</span>
       </div>
-      <div className="flex items-center gap-1.5 text-xs">
-        <Users className="w-3 h-3 flex-shrink-0" />
-        <span>{booking.user.displayName}</span>
-      </div>
       {booking.meetingType && booking.meetingType !== "none" && (
         <div className="flex items-center gap-1.5 text-xs">
           {getMeetingTypeIcon(booking.meetingType)}
