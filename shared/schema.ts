@@ -58,6 +58,7 @@ export const bookings = pgTable("bookings", {
   endTime: timestamp("end_time", { withTimezone: true }).notNull(),
   status: bookingStatusEnum("status").notNull().default("confirmed"),
   meetingType: text("meeting_type").default("none"),
+  meetingLink: text("meeting_link"),
   attendees: text("attendees").array(),
   isRecurring: boolean("is_recurring").notNull().default(false),
   bookedForName: text("booked_for_name"),
@@ -98,6 +99,7 @@ export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true 
   bookedForName: z.string().nullable().optional(),
   bookedForEmail: z.string().nullable().optional(),
   msGraphEventId: z.string().nullable().optional(),
+  meetingLink: z.string().nullable().optional(),
 });
 export const insertUserFacilityAssignmentSchema = createInsertSchema(userFacilityAssignments).omit({ id: true });
 export const insertGraphSubscriptionSchema = createInsertSchema(graphSubscriptions).omit({ id: true, createdAt: true });
