@@ -31,6 +31,7 @@ import {
   LogIn,
 } from "lucide-react";
 import type { Facility, RoomWithFacility } from "@shared/schema";
+import logoImage from "../assets/images/MeetSpace_full.png";
 
 const bookingFormSchema = z.object({
   roomId: z.string().min(1, "Please select a room"),
@@ -214,6 +215,11 @@ export default function BookRoom() {
   if (bookingComplete) {
     return (
       <div className={isGuest ? "min-h-screen bg-background p-6 max-w-3xl mx-auto" : ""}>
+        {isGuest && (
+          <div className="flex justify-center mb-6">
+            <img src={logoImage} alt="MeetSpace" className="w-64 object-contain" data-testid="img-book-logo" />
+          </div>
+        )}
         <Card className="max-w-md mx-auto mt-12">
           <CardContent className="pt-6 text-center space-y-4">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
@@ -238,6 +244,11 @@ export default function BookRoom() {
 
   const content = (
     <div>
+      {isGuest && (
+        <div className="mb-4">
+          <img src={logoImage} alt="MeetSpace" className="w-64 object-contain" data-testid="img-book-logo" />
+        </div>
+      )}
       <PageHeader
         title="Book a Room"
         description={isGuest ? "Book a conference room — no account required" : "Select a room and schedule your meeting"}
