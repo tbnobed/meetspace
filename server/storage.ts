@@ -32,6 +32,7 @@ export interface IStorage {
   createUser(data: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
+  nullifyAuditLogUser(userId: string): Promise<void>;
   getAdminEmails(): Promise<string[]>;
 
   // User Facility Assignments
@@ -148,6 +149,10 @@ export class DatabaseStorage implements IStorage {
   async deleteUser(id: string): Promise<boolean> {
     const result = await db.delete(users).where(eq(users.id, id)).returning();
     return result.length > 0;
+  }
+
+  async nullifyAuditLogUser(userId: string): Promise<void> {
+    await db.update(auditLogs).set({ userId: null }).where(eq(auditLogs.userId, userId));
   }
 
   async getAdminEmails(): Promise<string[]> {

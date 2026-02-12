@@ -570,6 +570,12 @@ export async function registerRoutes(
       if (!existing) {
         return res.status(404).json({ message: "User not found" });
       }
+      const allBookings = await storage.getBookings();
+      const userBookings = allBookings.filter((b) => b.userId === id && b.status !== "cancelled");
+      if (userBookings.length > 0) {
+        return res.status(409).json({ message: "Cannot delete user with existing bookings. Cancel their bookings first." });
+      }
+      await storage.nullifyAuditLogUser(id);
       const deleted = await storage.deleteUser(id);
       if (!deleted) {
         return res.status(500).json({ message: "Failed to delete user" });
