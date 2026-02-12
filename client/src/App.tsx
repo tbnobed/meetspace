@@ -18,6 +18,7 @@ import AdminRooms from "@/pages/admin/rooms";
 import AdminFacilities from "@/pages/admin/facilities";
 import AdminUsers from "@/pages/admin/users";
 import AdminAuditLog from "@/pages/admin/audit-log";
+import AdminWebhooks from "@/pages/admin/webhooks";
 import AllMeetings from "@/pages/all-meetings";
 import AuthPage from "@/pages/auth";
 import NotFound from "@/pages/not-found";
@@ -76,6 +77,7 @@ function AuthenticatedLayout() {
                 <Route path="/admin/facilities">{() => <AdminRoute component={AdminFacilities} />}</Route>
                 <Route path="/admin/users">{() => <AdminRoute component={AdminUsers} />}</Route>
                 <Route path="/admin/audit">{() => <AdminRoute component={AdminAuditLog} />}</Route>
+                <Route path="/admin/webhooks">{() => <AdminRoute component={AdminWebhooks} />}</Route>
                 <Route component={NotFound} />
               </Switch>
             </main>

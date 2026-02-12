@@ -65,6 +65,19 @@ export const bookings = pgTable("bookings", {
   msGraphEventId: text("ms_graph_event_id"),
 });
 
+export const graphSubscriptions = pgTable("graph_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roomId: varchar("room_id").notNull().references(() => rooms.id, { onDelete: "cascade" }),
+  roomEmail: text("room_email").notNull(),
+  subscriptionId: text("subscription_id").notNull(),
+  expirationDateTime: timestamp("expiration_date_time", { withTimezone: true }).notNull(),
+  clientState: text("client_state").notNull(),
+  status: text("status").notNull().default("active"),
+  lastNotificationAt: timestamp("last_notification_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+});
+
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id),
@@ -87,6 +100,7 @@ export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true 
   msGraphEventId: z.string().nullable().optional(),
 });
 export const insertUserFacilityAssignmentSchema = createInsertSchema(userFacilityAssignments).omit({ id: true });
+export const insertGraphSubscriptionSchema = createInsertSchema(graphSubscriptions).omit({ id: true, createdAt: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, timestamp: true });
 
 // Types
@@ -100,6 +114,8 @@ export type Booking = typeof bookings.$inferSelect;
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type UserFacilityAssignment = typeof userFacilityAssignments.$inferSelect;
 export type InsertUserFacilityAssignment = z.infer<typeof insertUserFacilityAssignmentSchema>;
+export type GraphSubscription = typeof graphSubscriptions.$inferSelect;
+export type InsertGraphSubscription = z.infer<typeof insertGraphSubscriptionSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 

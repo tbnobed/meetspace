@@ -253,6 +253,81 @@ export async function getEventDetails(
   }
 }
 
+export async function getCalendarEvent(
+  roomEmail: string,
+  eventId: string
+): Promise<any | null> {
+  try {
+    const event = await graphFetch(
+      `/users/${roomEmail}/events/${eventId}?$select=id,subject,start,end,organizer,attendees,isOnlineMeeting,onlineMeetingProvider,isCancelled,body`,
+      { headers: { Prefer: 'outlook.timezone="UTC"' } }
+    );
+    return event;
+  } catch (error: any) {
+    if (error.message?.includes("404")) return null;
+    throw error;
+  }
+}
+
+export interface CreateSubscriptionParams {
+  roomEmail: string;
+  notificationUrl: string;
+  clientState: string;
+  expirationMinutes?: number;
+}
+
+export async function createGraphSubscription(params: CreateSubscriptionParams): Promise<{
+  subscriptionId: string;
+  expirationDateTime: string;
+}> {
+  const expiration = new Date();
+  expiration.setMinutes(expiration.getMinutes() + (params.expirationMinutes || 4200));
+
+  const subscriptionData = {
+    changeType: "created,updated,deleted",
+    notificationUrl: params.notificationUrl,
+    resource: `/users/${params.roomEmail}/events`,
+    expirationDateTime: expiration.toISOString(),
+    clientState: params.clientState,
+  };
+
+  const result = await graphFetch("/subscriptions", {
+    method: "POST",
+    body: JSON.stringify(subscriptionData),
+  });
+
+  return {
+    subscriptionId: result.id,
+    expirationDateTime: result.expirationDateTime,
+  };
+}
+
+export async function renewGraphSubscription(subscriptionId: string, expirationMinutes?: number): Promise<string> {
+  const expiration = new Date();
+  expiration.setMinutes(expiration.getMinutes() + (expirationMinutes || 4200));
+
+  const result = await graphFetch(`/subscriptions/${subscriptionId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      expirationDateTime: expiration.toISOString(),
+    }),
+  });
+
+  return result.expirationDateTime;
+}
+
+export async function deleteGraphSubscription(subscriptionId: string): Promise<void> {
+  try {
+    await graphFetch(`/subscriptions/${subscriptionId}`, {
+      method: "DELETE",
+    });
+  } catch (error: any) {
+    if (!error.message?.includes("404")) {
+      throw error;
+    }
+  }
+}
+
 export async function testConnection(): Promise<{ success: boolean; message: string; roomCount?: number }> {
   try {
     const rooms = await listGraphRooms();

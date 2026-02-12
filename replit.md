@@ -42,6 +42,7 @@ Conference room management system for a multi-facility organization with ~20 con
 - `/admin/rooms` - Room CRUD management (admin only)
 - `/admin/facilities` - Facility CRUD management (admin only)
 - `/admin/users` - User CRUD management (admin only)
+- `/admin/webhooks` - Calendar webhook subscription management (admin only)
 - `/admin/audit` - Audit log viewer (admin only)
 
 ## Data Model
@@ -115,9 +116,31 @@ All routes prefixed with `/api/`:
   - Conflict detection: Events conflicting with existing bookings are skipped
   - Organizer info stored in bookedForName/bookedForEmail
   - Configurable time range (7-90 days ahead) and optional facility filter
+- **Webhook subscriptions (automatic sync)**: Real-time calendar sync via Microsoft Graph change notifications
+  - On server startup, auto-subscribes to calendar changes for all rooms with msGraphRoomEmail
+  - Microsoft sends POST notifications to `/api/graph/webhook` when room calendar events change
+  - Handles created/updated/deleted events: auto-creates bookings, updates existing, cancels deleted
+  - Subscriptions expire after ~3 days; hourly renewal scheduler auto-renews expiring subscriptions
+  - Deduplication by msGraphEventId prevents duplicate bookings
+  - New bookings created by webhook use first admin user as owner
+  - **Environment variable**: `WEBHOOK_BASE_URL` - public HTTPS URL for webhook endpoint (falls back to REPLIT_DEV_DOMAIN)
+  - **Service module**: `server/webhooks.ts` - subscription lifecycle, notification processing, renewal scheduler
+  - **Database table**: `graph_subscriptions` - tracks subscription ID, room, expiration, status, errors
+  - **Admin UI**: `/admin/webhooks` page shows subscription status, allows subscribe all/remove/refresh
+- **Self-hosted Ubuntu deployment**:
+  - Set `WEBHOOK_BASE_URL` to the public HTTPS URL (e.g., `https://meetspace.yourcompany.com`)
+  - Use Nginx reverse proxy with Let's Encrypt SSL for HTTPS
+  - Webhook endpoint must be accessible at `{WEBHOOK_BASE_URL}/api/graph/webhook`
+  - Subscriptions auto-recover if server restarts (re-subscribes on startup)
 - **API routes** (admin only):
   - `GET /api/graph/status` - Check if Graph credentials are configured
   - `POST /api/graph/test` - Test connection to Microsoft Graph
   - `GET /api/graph/rooms` - List room resources from Microsoft 365
   - `POST /api/graph/sync-rooms` - Import/update rooms from M365 into a facility
   - `POST /api/graph/import-events` - Import calendar events from M365 room calendars as bookings
+  - `GET /api/graph/subscriptions` - List webhook subscriptions with room details
+  - `POST /api/graph/subscriptions/subscribe-all` - Subscribe all M365 rooms to webhooks
+  - `POST /api/graph/subscriptions/subscribe-room` - Subscribe single room
+  - `DELETE /api/graph/subscriptions/:id` - Remove single subscription
+  - `DELETE /api/graph/subscriptions` - Remove all subscriptions
+  - `POST /api/graph/webhook` - Webhook endpoint (public, called by Microsoft Graph)

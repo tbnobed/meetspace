@@ -1,13 +1,14 @@
 import { eq, and, gte, lte, or, desc, ne, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
-  facilities, rooms, users, bookings, auditLogs, userFacilityAssignments,
+  facilities, rooms, users, bookings, auditLogs, userFacilityAssignments, graphSubscriptions,
   type Facility, type InsertFacility,
   type Room, type InsertRoom,
   type User, type InsertUser,
   type Booking, type InsertBooking,
   type AuditLog, type InsertAuditLog,
   type UserFacilityAssignment, type InsertUserFacilityAssignment,
+  type GraphSubscription, type InsertGraphSubscription,
   type RoomWithFacility, type BookingWithDetails,
 } from "@shared/schema";
 
@@ -51,6 +52,19 @@ export interface IStorage {
   // Bookings - Graph
   updateBookingGraphEventId(id: string, msGraphEventId: string): Promise<void>;
   getRoomByGraphEmail(email: string): Promise<RoomWithFacility | undefined>;
+
+  // Bookings - additional
+  getBookingByGraphEventId(msGraphEventId: string): Promise<Booking | undefined>;
+  updateBooking(id: string, data: Partial<InsertBooking>): Promise<Booking | undefined>;
+
+  // Graph Subscriptions
+  getGraphSubscriptions(): Promise<GraphSubscription[]>;
+  getGraphSubscriptionByRoomEmail(roomEmail: string): Promise<GraphSubscription | undefined>;
+  getGraphSubscriptionBySubscriptionId(subscriptionId: string): Promise<GraphSubscription | undefined>;
+  createGraphSubscription(data: InsertGraphSubscription): Promise<GraphSubscription>;
+  updateGraphSubscription(id: string, data: Partial<InsertGraphSubscription>): Promise<GraphSubscription | undefined>;
+  deleteGraphSubscription(id: string): Promise<boolean>;
+  getExpiringSubscriptions(beforeDate: Date): Promise<GraphSubscription[]>;
 
   // Audit
   getAuditLogs(): Promise<(AuditLog & { user?: Pick<User, "id" | "displayName" | "email"> })[]>;
@@ -303,6 +317,63 @@ export class DatabaseStorage implements IStorage {
       .where(eq(rooms.msGraphRoomEmail, email));
     if (!result) return undefined;
     return { ...result.rooms, facility: result.facilities };
+  }
+
+  // Bookings - additional
+  async getBookingByGraphEventId(msGraphEventId: string): Promise<Booking | undefined> {
+    const [result] = await db.select().from(bookings).where(eq(bookings.msGraphEventId, msGraphEventId));
+    return result;
+  }
+
+  async updateBooking(id: string, data: Partial<InsertBooking>): Promise<Booking | undefined> {
+    const updateData: Record<string, any> = { ...data };
+    if (updateData.startTime && typeof updateData.startTime === "string") {
+      updateData.startTime = new Date(updateData.startTime);
+    }
+    if (updateData.endTime && typeof updateData.endTime === "string") {
+      updateData.endTime = new Date(updateData.endTime);
+    }
+    const [result] = await db.update(bookings).set(updateData).where(eq(bookings.id, id)).returning();
+    return result;
+  }
+
+  // Graph Subscriptions
+  async getGraphSubscriptions(): Promise<GraphSubscription[]> {
+    return db.select().from(graphSubscriptions).orderBy(graphSubscriptions.roomEmail);
+  }
+
+  async getGraphSubscriptionByRoomEmail(roomEmail: string): Promise<GraphSubscription | undefined> {
+    const [result] = await db.select().from(graphSubscriptions).where(eq(graphSubscriptions.roomEmail, roomEmail));
+    return result;
+  }
+
+  async getGraphSubscriptionBySubscriptionId(subscriptionId: string): Promise<GraphSubscription | undefined> {
+    const [result] = await db.select().from(graphSubscriptions).where(eq(graphSubscriptions.subscriptionId, subscriptionId));
+    return result;
+  }
+
+  async createGraphSubscription(data: InsertGraphSubscription): Promise<GraphSubscription> {
+    const [result] = await db.insert(graphSubscriptions).values(data).returning();
+    return result;
+  }
+
+  async updateGraphSubscription(id: string, data: Partial<InsertGraphSubscription>): Promise<GraphSubscription | undefined> {
+    const [result] = await db.update(graphSubscriptions).set(data).where(eq(graphSubscriptions.id, id)).returning();
+    return result;
+  }
+
+  async deleteGraphSubscription(id: string): Promise<boolean> {
+    const result = await db.delete(graphSubscriptions).where(eq(graphSubscriptions.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getExpiringSubscriptions(beforeDate: Date): Promise<GraphSubscription[]> {
+    return db.select().from(graphSubscriptions).where(
+      and(
+        lte(graphSubscriptions.expirationDateTime, beforeDate),
+        eq(graphSubscriptions.status, "active")
+      )
+    );
   }
 
   // Audit

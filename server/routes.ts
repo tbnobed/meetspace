@@ -22,6 +22,15 @@ import {
   getEventDetails,
   testConnection as testGraphConnection,
 } from "./graph";
+import {
+  setSocketIO,
+  subscribeAllRooms,
+  removeSubscription,
+  removeAllSubscriptions,
+  processNotification,
+  startRenewalScheduler,
+  createSubscriptionForRoom,
+} from "./webhooks";
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
@@ -53,6 +62,23 @@ export async function registerRoutes(
   io.on("connection", (socket) => {
     socket.on("disconnect", () => {});
   });
+
+  setSocketIO(io);
+
+  if (isGraphConfigured()) {
+    setTimeout(async () => {
+      try {
+        const result = await subscribeAllRooms();
+        console.log(`Graph webhook subscriptions: ${result.success}/${result.total} active`);
+        if (result.errors.length > 0) {
+          console.warn("Subscription errors:", result.errors);
+        }
+        startRenewalScheduler();
+      } catch (err: any) {
+        console.error("Failed to initialize Graph webhooks:", err.message);
+      }
+    }, 5000);
+  }
 
   // ── Auth Routes (public) ──
   app.post("/api/auth/login", async (req, res) => {
@@ -906,6 +932,113 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to import calendar events" });
+    }
+  });
+
+  // ── Graph Webhook Endpoint (public - called by Microsoft) ──
+  app.post("/api/graph/webhook", async (req, res) => {
+    if (req.query.validationToken) {
+      console.log("Graph webhook validation request received");
+      res.set("Content-Type", "text/plain");
+      return res.status(200).send(req.query.validationToken as string);
+    }
+
+    res.status(202).send();
+
+    try {
+      const notifications = req.body?.value;
+      if (!Array.isArray(notifications)) return;
+
+      for (const notification of notifications) {
+        try {
+          await processNotification(notification);
+        } catch (err: any) {
+          console.error("Error processing webhook notification:", err.message);
+        }
+      }
+    } catch (err: any) {
+      console.error("Webhook processing error:", err.message);
+    }
+  });
+
+  // ── Graph Subscription Management (Admin) ──
+  app.get("/api/graph/subscriptions", requireAdmin, async (_req, res) => {
+    try {
+      const subs = await storage.getGraphSubscriptions();
+      const rooms = await storage.getRooms();
+      const enriched = subs.map(sub => {
+        const room = rooms.find(r => r.id === sub.roomId);
+        return {
+          ...sub,
+          roomName: room?.name || "Unknown",
+          facilityName: room?.facility?.name || "Unknown",
+          isExpired: new Date(sub.expirationDateTime) < new Date(),
+        };
+      });
+      res.json(enriched);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to get subscriptions" });
+    }
+  });
+
+  app.post("/api/graph/subscriptions/subscribe-all", requireAdmin, async (req, res) => {
+    if (!isGraphConfigured()) {
+      return res.status(400).json({ message: "Microsoft Graph credentials not configured" });
+    }
+    try {
+      const result = await subscribeAllRooms();
+      await storage.createAuditLog({
+        userId: req.session.userId as string,
+        action: "room_updated",
+        entityType: "subscription",
+        entityId: "all",
+        details: `Subscribed to Graph webhooks: ${result.success}/${result.total} rooms`,
+      });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to subscribe rooms" });
+    }
+  });
+
+  app.post("/api/graph/subscriptions/subscribe-room", requireAdmin, async (req, res) => {
+    if (!isGraphConfigured()) {
+      return res.status(400).json({ message: "Microsoft Graph credentials not configured" });
+    }
+    const { roomId } = req.body;
+    if (!roomId) return res.status(400).json({ message: "roomId is required" });
+
+    try {
+      const room = await storage.getRoom(roomId);
+      if (!room) return res.status(404).json({ message: "Room not found" });
+      if (!room.msGraphRoomEmail) return res.status(400).json({ message: "Room has no Microsoft 365 email configured" });
+
+      const result = await createSubscriptionForRoom(room.id, room.msGraphRoomEmail);
+      if (result.success) {
+        res.json({ message: `Subscribed to ${room.name}` });
+      } else {
+        res.status(500).json({ message: result.error || "Failed to subscribe" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to subscribe room" });
+    }
+  });
+
+  app.delete("/api/graph/subscriptions/:id", requireAdmin, async (req, res) => {
+    try {
+      const removed = await removeSubscription(req.params.id as string);
+      if (!removed) return res.status(404).json({ message: "Subscription not found" });
+      res.json({ message: "Subscription removed" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to remove subscription" });
+    }
+  });
+
+  app.delete("/api/graph/subscriptions", requireAdmin, async (req, res) => {
+    try {
+      const count = await removeAllSubscriptions();
+      res.json({ message: `Removed ${count} subscriptions`, count });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to remove subscriptions" });
     }
   });
 
