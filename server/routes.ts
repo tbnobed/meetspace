@@ -168,13 +168,31 @@ export async function registerRoutes(
     res.json(safeUser);
   });
 
-  // ── Public Routes ──
-  app.get("/api/facilities", async (_req, res) => {
+  // ── Public Routes (with site_admin filtering) ──
+  app.get("/api/facilities", async (req, res) => {
+    if (req.session.userId) {
+      const user = await storage.getUser(req.session.userId);
+      if (user && user.role === "site_admin") {
+        const assignments = await storage.getUserFacilityAssignments(user.id);
+        const facilityIds = assignments.map((a) => a.facilityId);
+        const result = await storage.getFacilitiesByIds(facilityIds);
+        return res.json(result);
+      }
+    }
     const result = await storage.getFacilities();
     res.json(result);
   });
 
-  app.get("/api/rooms", async (_req, res) => {
+  app.get("/api/rooms", async (req, res) => {
+    if (req.session.userId) {
+      const user = await storage.getUser(req.session.userId);
+      if (user && user.role === "site_admin") {
+        const assignments = await storage.getUserFacilityAssignments(user.id);
+        const facilityIds = assignments.map((a) => a.facilityId);
+        const result = await storage.getRoomsByFacilityIds(facilityIds);
+        return res.json(result);
+      }
+    }
     const result = await storage.getRooms();
     res.json(result);
   });
@@ -349,10 +367,24 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Invalid date format" });
     }
     const result = await storage.getBookingsByRange(startDate, endDate);
+    const user = await storage.getUser(req.session.userId as string);
+    if (user && user.role === "site_admin") {
+      const assignments = await storage.getUserFacilityAssignments(user.id);
+      const facilityIds = assignments.map((a) => a.facilityId);
+      return res.json(result.filter((b) => facilityIds.includes(b.room.facilityId)));
+    }
     res.json(result);
   });
 
-  app.get("/api/bookings/today", requireAuth, async (_req, res) => {
+  app.get("/api/bookings/today", requireAuth, async (req, res) => {
+    const user = await storage.getUser(req.session.userId as string);
+    if (user && user.role === "site_admin") {
+      const assignments = await storage.getUserFacilityAssignments(user.id);
+      const facilityIds = assignments.map((a) => a.facilityId);
+      const allToday = await storage.getTodayBookings();
+      const filtered = allToday.filter((b) => facilityIds.includes(b.room.facilityId));
+      return res.json(filtered);
+    }
     const result = await storage.getTodayBookings();
     res.json(result);
   });

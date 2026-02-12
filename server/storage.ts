@@ -15,12 +15,14 @@ import {
 export interface IStorage {
   // Facilities
   getFacilities(): Promise<Facility[]>;
+  getFacilitiesByIds(ids: string[]): Promise<Facility[]>;
   getFacility(id: string): Promise<Facility | undefined>;
   createFacility(data: InsertFacility): Promise<Facility>;
   updateFacility(id: string, data: Partial<InsertFacility>): Promise<Facility | undefined>;
 
   // Rooms
   getRooms(): Promise<RoomWithFacility[]>;
+  getRoomsByFacilityIds(facilityIds: string[]): Promise<RoomWithFacility[]>;
   getRoom(id: string): Promise<RoomWithFacility | undefined>;
   createRoom(data: InsertRoom): Promise<Room>;
   updateRoom(id: string, data: Partial<InsertRoom>): Promise<Room | undefined>;
@@ -79,6 +81,11 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(facilities).orderBy(facilities.name);
   }
 
+  async getFacilitiesByIds(ids: string[]): Promise<Facility[]> {
+    if (ids.length === 0) return [];
+    return db.select().from(facilities).where(inArray(facilities.id, ids)).orderBy(facilities.name);
+  }
+
   async getFacility(id: string): Promise<Facility | undefined> {
     const [result] = await db.select().from(facilities).where(eq(facilities.id, id));
     return result;
@@ -100,6 +107,17 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(rooms)
       .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
+      .orderBy(rooms.name);
+    return result.map((r) => ({ ...r.rooms, facility: r.facilities }));
+  }
+
+  async getRoomsByFacilityIds(facilityIds: string[]): Promise<RoomWithFacility[]> {
+    if (facilityIds.length === 0) return [];
+    const result = await db
+      .select()
+      .from(rooms)
+      .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
+      .where(inArray(rooms.facilityId, facilityIds))
       .orderBy(rooms.name);
     return result.map((r) => ({ ...r.rooms, facility: r.facilities }));
   }
