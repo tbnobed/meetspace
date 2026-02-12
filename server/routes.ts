@@ -118,6 +118,10 @@ export async function registerRoutes(
     if (existing) {
       return res.status(409).json({ message: "Username already taken" });
     }
+    const existingEmail = await storage.getUserByEmail(parsed.data.email);
+    if (existingEmail) {
+      return res.status(409).json({ message: "An account with this email already exists" });
+    }
     const hashed = await bcrypt.hash(parsed.data.password, 10);
     const user = await storage.createUser({
       username: parsed.data.username,
