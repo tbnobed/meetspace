@@ -98,3 +98,19 @@ All routes prefixed with `/api/`:
 - **User invite**: Sent when admin invites a user via email with temporary credentials
 - Email sending is fire-and-forget (errors logged but don't block operations)
 - Email service module: `server/email.ts`
+
+## Microsoft Graph API Integration
+- **Secrets**: MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT_ID (Azure App Registration)
+- **Service module**: `server/graph.ts` using @azure/msal-node for client credentials auth
+- **Room sync**: Admin can sync conference rooms from Microsoft 365 directory into MeetSpace, assigning to facilities
+- **Calendar events**: Bookings automatically create Outlook calendar events on the room's mailbox calendar
+  - Teams meetings: Created via Graph API with `isOnlineMeeting: true`
+  - Zoom/Google Meet: Links embedded in event body HTML
+- **Event cancellation**: Cancelling a booking also cancels the corresponding Outlook calendar event
+- **Schema fields**: `msGraphRoomEmail` on rooms table, `msGraphEventId` on bookings table
+- **Admin UI**: "Sync from Microsoft 365" button on Room Management page when Graph is configured
+- **API routes** (admin only):
+  - `GET /api/graph/status` - Check if Graph credentials are configured
+  - `POST /api/graph/test` - Test connection to Microsoft Graph
+  - `GET /api/graph/rooms` - List room resources from Microsoft 365
+  - `POST /api/graph/sync-rooms` - Import/update rooms from M365 into a facility

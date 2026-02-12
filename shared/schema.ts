@@ -28,6 +28,7 @@ export const rooms = pgTable("rooms", {
   floor: text("floor"),
   equipment: text("equipment").array(),
   isActive: boolean("is_active").notNull().default(true),
+  msGraphRoomEmail: text("ms_graph_room_email"),
 });
 
 export const users = pgTable("users", {
@@ -61,6 +62,7 @@ export const bookings = pgTable("bookings", {
   isRecurring: boolean("is_recurring").notNull().default(false),
   bookedForName: text("booked_for_name"),
   bookedForEmail: text("booked_for_email"),
+  msGraphEventId: text("ms_graph_event_id"),
 });
 
 export const auditLogs = pgTable("audit_logs", {
@@ -82,6 +84,7 @@ export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true 
   endTime: z.string().or(z.date()),
   bookedForName: z.string().nullable().optional(),
   bookedForEmail: z.string().nullable().optional(),
+  msGraphEventId: z.string().nullable().optional(),
 });
 export const insertUserFacilityAssignmentSchema = createInsertSchema(userFacilityAssignments).omit({ id: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, timestamp: true });

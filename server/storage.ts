@@ -47,6 +47,10 @@ export interface IStorage {
   cancelBooking(id: string): Promise<Booking | undefined>;
   checkConflict(roomId: string, startTime: Date, endTime: Date, excludeId?: string): Promise<boolean>;
 
+  // Bookings - Graph
+  updateBookingGraphEventId(id: string, msGraphEventId: string): Promise<void>;
+  getRoomByGraphEmail(email: string): Promise<RoomWithFacility | undefined>;
+
   // Audit
   getAuditLogs(): Promise<(AuditLog & { user?: Pick<User, "id" | "displayName" | "email"> })[]>;
   createAuditLog(data: InsertAuditLog): Promise<AuditLog>;
@@ -280,6 +284,20 @@ export class DatabaseStorage implements IStorage {
     }
     const [result] = await db.select().from(bookings).where(and(...conditions)).limit(1);
     return !!result;
+  }
+
+  async updateBookingGraphEventId(id: string, msGraphEventId: string): Promise<void> {
+    await db.update(bookings).set({ msGraphEventId }).where(eq(bookings.id, id));
+  }
+
+  async getRoomByGraphEmail(email: string): Promise<RoomWithFacility | undefined> {
+    const [result] = await db
+      .select()
+      .from(rooms)
+      .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
+      .where(eq(rooms.msGraphRoomEmail, email));
+    if (!result) return undefined;
+    return { ...result.rooms, facility: result.facilities };
   }
 
   // Audit

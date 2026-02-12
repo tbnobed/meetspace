@@ -13,6 +13,13 @@ import {
   sendNewRegistrationAlert,
   sendInviteEmail,
 } from "./email";
+import {
+  isGraphConfigured,
+  listGraphRooms,
+  createCalendarEvent,
+  cancelCalendarEvent,
+  testConnection as testGraphConnection,
+} from "./graph";
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
@@ -251,6 +258,25 @@ export async function registerRoutes(
       }
     }
 
+    if (isGraphConfigured() && room && room.msGraphRoomEmail) {
+      try {
+        const graphResult = await createCalendarEvent({
+          roomEmail: room.msGraphRoomEmail,
+          subject: booking.title,
+          startTime: new Date(booking.startTime),
+          endTime: new Date(booking.endTime),
+          timezone: room.facility.timezone,
+          body: booking.description || undefined,
+          meetingType: booking.meetingType || undefined,
+          organizerEmail: room.msGraphRoomEmail,
+          attendees: bookedForEmail ? [bookedForEmail] : undefined,
+        });
+        await storage.updateBookingGraphEventId(booking.id, graphResult.eventId);
+      } catch (graphErr: any) {
+        console.error("Failed to create Graph calendar event:", graphErr.message);
+      }
+    }
+
     io.emit("bookings:updated");
     res.status(201).json(booking);
   });
@@ -309,6 +335,14 @@ export async function registerRoutes(
         startTime: formatTime(new Date(booking.startTime)),
         endTime: formatTime(new Date(booking.endTime)),
       }).catch(() => {});
+
+      if (isGraphConfigured() && booking.msGraphEventId && bookingDetails.room.msGraphRoomEmail) {
+        try {
+          await cancelCalendarEvent(bookingDetails.room.msGraphRoomEmail, booking.msGraphEventId);
+        } catch (graphErr: any) {
+          console.error("Failed to cancel Graph calendar event:", graphErr.message);
+        }
+      }
     }
 
     io.emit("bookings:updated");
@@ -619,6 +653,87 @@ export async function registerRoutes(
   app.get("/api/audit-logs", requireAdmin, async (_req, res) => {
     const result = await storage.getAuditLogs();
     res.json(result);
+  });
+
+  // ── Microsoft Graph Routes (Admin) ──
+  app.get("/api/graph/status", requireAdmin, async (_req, res) => {
+    res.json({ configured: isGraphConfigured() });
+  });
+
+  app.post("/api/graph/test", requireAdmin, async (_req, res) => {
+    if (!isGraphConfigured()) {
+      return res.status(400).json({ success: false, message: "Microsoft Graph credentials not configured" });
+    }
+    const result = await testGraphConnection();
+    res.json(result);
+  });
+
+  app.get("/api/graph/rooms", requireAdmin, async (_req, res) => {
+    if (!isGraphConfigured()) {
+      return res.status(400).json({ message: "Microsoft Graph credentials not configured" });
+    }
+    try {
+      const graphRooms = await listGraphRooms();
+      res.json(graphRooms);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch rooms from Microsoft Graph" });
+    }
+  });
+
+  app.post("/api/graph/sync-rooms", requireAdmin, async (req, res) => {
+    if (!isGraphConfigured()) {
+      return res.status(400).json({ message: "Microsoft Graph credentials not configured" });
+    }
+    try {
+      const { facilityId, roomMappings } = req.body;
+      if (!facilityId) {
+        return res.status(400).json({ message: "facilityId is required" });
+      }
+
+      const graphRooms = await listGraphRooms();
+      const existingRooms = await storage.getRooms();
+      const results: { created: number; updated: number; skipped: number } = { created: 0, updated: 0, skipped: 0 };
+
+      const roomsToSync = roomMappings
+        ? graphRooms.filter((gr: any) => roomMappings.includes(gr.emailAddress))
+        : graphRooms;
+
+      for (const gr of roomsToSync) {
+        const existing = existingRooms.find((r) => r.msGraphRoomEmail === gr.emailAddress);
+        if (existing) {
+          await storage.updateRoom(existing.id, {
+            name: gr.displayName,
+            capacity: gr.capacity || existing.capacity,
+            msGraphRoomEmail: gr.emailAddress,
+          });
+          results.updated++;
+        } else {
+          await storage.createRoom({
+            facilityId,
+            name: gr.displayName,
+            capacity: gr.capacity || 1,
+            floor: gr.floorLabel || null,
+            equipment: [],
+            isActive: true,
+            msGraphRoomEmail: gr.emailAddress,
+          });
+          results.created++;
+        }
+      }
+
+      await storage.createAuditLog({
+        userId: req.session.userId as string,
+        action: "room_created",
+        entityType: "room",
+        entityId: facilityId,
+        details: `Synced rooms from Microsoft Graph: ${results.created} created, ${results.updated} updated`,
+      });
+
+      io.emit("rooms:updated");
+      res.json({ message: `Sync complete: ${results.created} created, ${results.updated} updated`, ...results });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to sync rooms" });
+    }
   });
 
   return httpServer;

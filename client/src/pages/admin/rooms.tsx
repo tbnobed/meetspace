@@ -15,7 +15,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,7 +23,7 @@ import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { EQUIPMENT_OPTIONS, getTimezoneAbbr } from "@/lib/constants";
-import { Plus, DoorOpen, Users, Building2, Pencil } from "lucide-react";
+import { Plus, DoorOpen, Users, Building2, Pencil, RefreshCw, Cloud, Mail, CheckCircle2, Loader2 } from "lucide-react";
 import type { Facility, RoomWithFacility } from "@shared/schema";
 
 const roomFormSchema = z.object({
@@ -188,12 +188,215 @@ function RoomFormDialog({ room, facilities, open, onOpenChange }: {
   );
 }
 
+interface GraphRoom {
+  id: string;
+  displayName: string;
+  emailAddress: string;
+  capacity: number;
+  building: string | null;
+  floorLabel: string | null;
+}
+
+function SyncDialog({ facilities, open, onOpenChange }: {
+  facilities: Facility[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [selectedFacility, setSelectedFacility] = useState("");
+  const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
+
+  const testMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/graph/test");
+      return res.json();
+    },
+  });
+
+  const { data: graphRooms, isLoading: graphRoomsLoading, refetch: fetchGraphRooms } = useQuery<GraphRoom[]>({
+    queryKey: ["/api/graph/rooms"],
+    enabled: false,
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/graph/sync-rooms", {
+        facilityId: selectedFacility,
+        roomMappings: selectedRooms.length > 0 ? selectedRooms : undefined,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
+      toast({ title: "Sync Complete", description: data.message });
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Sync Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleTest = async () => {
+    try {
+      const result = await testMutation.mutateAsync();
+      if (result.success) {
+        toast({ title: "Connection Successful", description: result.message });
+        fetchGraphRooms();
+      } else {
+        toast({ title: "Connection Failed", description: result.message, variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Connection Failed", description: error.message || "Could not connect to Microsoft Graph", variant: "destructive" });
+    }
+  };
+
+  const toggleRoom = (email: string) => {
+    setSelectedRooms((prev) =>
+      prev.includes(email) ? prev.filter((r) => r !== email) : [...prev, email]
+    );
+  };
+
+  const toggleAll = () => {
+    if (!graphRooms) return;
+    if (selectedRooms.length === graphRooms.length) {
+      setSelectedRooms([]);
+    } else {
+      setSelectedRooms(graphRooms.map((r) => r.emailAddress));
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Cloud className="w-5 h-5" />
+            Sync Rooms from Microsoft 365
+          </DialogTitle>
+          <DialogDescription>
+            Import conference rooms from your organization's Microsoft 365 directory.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleTest}
+              disabled={testMutation.isPending}
+              data-testid="button-test-graph"
+            >
+              {testMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Cloud className="w-4 h-4 mr-2" />}
+              Test Connection
+            </Button>
+            {testMutation.data?.success && (
+              <Badge variant="default" className="gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                Connected
+              </Badge>
+            )}
+          </div>
+
+          {graphRooms && graphRooms.length > 0 && (
+            <>
+              <div>
+                <label className="text-sm font-medium">Assign to Facility</label>
+                <Select value={selectedFacility} onValueChange={setSelectedFacility}>
+                  <SelectTrigger className="mt-1" data-testid="select-sync-facility">
+                    <SelectValue placeholder="Select facility for imported rooms" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {facilities.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium">
+                    Microsoft 365 Rooms ({graphRooms.length})
+                  </label>
+                  <Button variant="ghost" size="sm" onClick={toggleAll} data-testid="button-toggle-all-rooms">
+                    {selectedRooms.length === graphRooms.length ? "Deselect All" : "Select All"}
+                  </Button>
+                </div>
+                <div className="space-y-1 max-h-48 overflow-y-auto border rounded-md p-2">
+                  {graphRooms.map((gr) => (
+                    <label
+                      key={gr.emailAddress}
+                      className="flex items-center gap-2 p-1.5 rounded-md cursor-pointer hover-elevate"
+                      data-testid={`checkbox-graph-room-${gr.emailAddress}`}
+                    >
+                      <Checkbox
+                        checked={selectedRooms.includes(gr.emailAddress)}
+                        onCheckedChange={() => toggleRoom(gr.emailAddress)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{gr.displayName}</p>
+                        <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                          <Mail className="w-3 h-3" />
+                          {gr.emailAddress}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground flex-shrink-0">
+                        {gr.capacity > 0 && (
+                          <span className="flex items-center gap-0.5">
+                            <Users className="w-3 h-3" />
+                            {gr.capacity}
+                          </span>
+                        )}
+                        {gr.building && <span>{gr.building}</span>}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <Button
+                className="w-full"
+                onClick={() => syncMutation.mutate()}
+                disabled={!selectedFacility || syncMutation.isPending}
+                data-testid="button-sync-rooms"
+              >
+                {syncMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Sync {selectedRooms.length > 0 ? `${selectedRooms.length} Selected` : "All"} Rooms
+              </Button>
+            </>
+          )}
+
+          {graphRoomsLoading && (
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          )}
+
+          {graphRooms && graphRooms.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No room resources found in your Microsoft 365 organization.
+            </p>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function AdminRooms() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   const [editRoom, setEditRoom] = useState<RoomWithFacility | undefined>();
 
   const { data: rooms, isLoading: roomsLoading } = useQuery<RoomWithFacility[]>({ queryKey: ["/api/rooms"] });
   const { data: facilities } = useQuery<Facility[]>({ queryKey: ["/api/facilities"] });
+  const { data: graphStatus } = useQuery<{ configured: boolean }>({ queryKey: ["/api/graph/status"] });
 
   const handleEdit = (room: RoomWithFacility) => {
     setEditRoom(room);
@@ -220,10 +423,18 @@ export default function AdminRooms() {
         title="Room Management"
         description="Configure conference rooms across all facilities"
         actions={
-          <Button onClick={handleAdd} data-testid="button-add-room">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Room
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {graphStatus?.configured && (
+              <Button variant="outline" onClick={() => setSyncDialogOpen(true)} data-testid="button-open-sync">
+                <Cloud className="w-4 h-4 mr-2" />
+                Sync from Microsoft 365
+              </Button>
+            )}
+            <Button onClick={handleAdd} data-testid="button-add-room">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Room
+            </Button>
+          </div>
         }
       />
 
@@ -249,6 +460,12 @@ export default function AdminRooms() {
                       <div className="flex items-center gap-2">
                         <DoorOpen className="w-4 h-4 text-muted-foreground" />
                         <span className="font-medium text-sm">{room.name}</span>
+                        {room.msGraphRoomEmail && (
+                          <Badge variant="secondary" className="text-[10px] gap-0.5">
+                            <Cloud className="w-2.5 h-2.5" />
+                            M365
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -309,6 +526,14 @@ export default function AdminRooms() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
       />
+
+      {graphStatus?.configured && (
+        <SyncDialog
+          facilities={facilities || []}
+          open={syncDialogOpen}
+          onOpenChange={setSyncDialogOpen}
+        />
+      )}
     </div>
   );
 }
