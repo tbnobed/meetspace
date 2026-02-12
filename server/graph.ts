@@ -157,12 +157,12 @@ export async function createCalendarEvent(params: CreateEventParams): Promise<{ 
   const eventData: any = {
     subject,
     start: {
-      dateTime: startTime.toISOString().replace("Z", ""),
-      timeZone: timezone || "UTC",
+      dateTime: startTime.toISOString(),
+      timeZone: "UTC",
     },
     end: {
-      dateTime: endTime.toISOString().replace("Z", ""),
-      timeZone: timezone || "UTC",
+      dateTime: endTime.toISOString(),
+      timeZone: "UTC",
     },
     location: {
       displayName: "Conference Room",

@@ -262,16 +262,24 @@ export async function registerRoutes(
 
     if (isGraphConfigured() && room && room.msGraphRoomEmail) {
       try {
+        const eventAttendees: string[] = [];
+        if (booker?.email) eventAttendees.push(booker.email);
+        if (bookedForEmail && !eventAttendees.includes(bookedForEmail)) eventAttendees.push(bookedForEmail);
+        if (booking.attendees && Array.isArray(booking.attendees)) {
+          for (const email of booking.attendees) {
+            if (email && !eventAttendees.includes(email)) eventAttendees.push(email);
+          }
+        }
         const graphResult = await createCalendarEvent({
           roomEmail: room.msGraphRoomEmail,
           subject: booking.title,
           startTime: new Date(booking.startTime),
           endTime: new Date(booking.endTime),
-          timezone: room.facility.timezone,
+          timezone: "UTC",
           body: booking.description || undefined,
           meetingType: booking.meetingType || undefined,
           organizerEmail: room.msGraphRoomEmail,
-          attendees: bookedForEmail ? [bookedForEmail] : undefined,
+          attendees: eventAttendees.length > 0 ? eventAttendees : undefined,
         });
         await storage.updateBookingGraphEventId(booking.id, graphResult.eventId);
       } catch (graphErr: any) {
