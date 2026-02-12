@@ -18,7 +18,7 @@ import { useAuth } from "@/lib/auth";
 
 const mainNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "All Meetings", url: "/meetings", icon: List },
+  { title: "Rooms", url: "/meetings", icon: List },
   { title: "Book a Room", url: "/book", icon: CalendarPlus },
   { title: "My Bookings", url: "/bookings", icon: ClipboardList },
 ];
