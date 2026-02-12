@@ -296,6 +296,7 @@ export async function registerRoutes(
         startTime: formatTime(new Date(booking.startTime)),
         endTime: formatTime(new Date(booking.endTime)),
         meetingType: booking.meetingType || undefined,
+        meetingLink: booking.meetingLink || undefined,
         bookedForName: bookedForName,
       };
       sendBookingConfirmation(emailParams).catch(() => {});

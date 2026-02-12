@@ -66,6 +66,7 @@ export async function sendBookingConfirmation(params: {
   startTime: string;
   endTime: string;
   meetingType?: string;
+  meetingLink?: string | null;
   bookedForName?: string | null;
 }): Promise<boolean> {
   const dn = escapeHtml(params.displayName);
@@ -81,6 +82,13 @@ export async function sendBookingConfirmation(params: {
 
   const meetingBadge = params.meetingType && params.meetingType !== "none"
     ? `<span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${escapeHtml(params.meetingType)}</span>`
+    : "";
+
+  const meetingLinkRow = params.meetingLink
+    ? `<tr>
+          <td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Meeting Link</td>
+          <td style="padding: 6px 0; font-size: 14px;"><a href="${escapeHtml(params.meetingLink)}" style="color: #2563eb; text-decoration: underline;">Join Meeting</a></td>
+        </tr>`
     : "";
 
   const html = baseTemplate(`
@@ -108,6 +116,7 @@ export async function sendBookingConfirmation(params: {
           <td style="padding: 6px 0; color: #6b7280; font-size: 14px;">End</td>
           <td style="padding: 6px 0; color: #111827; font-size: 14px;">${endTime}</td>
         </tr>
+        ${meetingLinkRow}
       </table>
     </div>
     ${onBehalfOf}

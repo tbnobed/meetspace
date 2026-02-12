@@ -175,6 +175,17 @@ function BookingCard({ booking }: { booking: BookingWithDetails }) {
                 <Video className="w-3.5 h-3.5 flex-shrink-0" />
               )}
               <span className="capitalize">{booking.meetingType} Meeting</span>
+              {booking.meetingLink && (
+                <a
+                  href={booking.meetingLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline text-xs text-muted-foreground"
+                  data-testid={`link-meeting-${booking.id}`}
+                >
+                  Join
+                </a>
+              )}
             </div>
           )}
           {booking.attendees && booking.attendees.length > 0 && (

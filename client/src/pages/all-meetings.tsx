@@ -44,6 +44,7 @@ import {
   Presentation,
   Wifi,
   Clock,
+  Link2,
 } from "lucide-react";
 import { formatTime, getTimezoneAbbr } from "@/lib/constants";
 import { format } from "date-fns";
@@ -73,6 +74,7 @@ const quickBookSchema = z.object({
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
   meetingType: z.string().default("none"),
+  meetingLink: z.string().optional(),
   attendees: z.string().optional(),
 });
 
@@ -97,6 +99,7 @@ function QuickBookDialog({
       startTime: "",
       endTime: "",
       meetingType: "none",
+      meetingLink: "",
       attendees: "",
     },
   });
@@ -121,6 +124,7 @@ function QuickBookDialog({
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         meetingType: values.meetingType,
+        meetingLink: values.meetingType !== "none" && values.meetingLink ? values.meetingLink : undefined,
         attendees: attendeesArr.length > 0 ? attendeesArr : undefined,
         isRecurring: false,
       };
@@ -263,6 +267,31 @@ function QuickBookDialog({
                 </FormItem>
               )}
             />
+            {form.watch("meetingType") !== "none" && (
+              <FormField
+                control={form.control}
+                name="meetingLink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Meeting Link</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <Link2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <Input
+                          placeholder={form.watch("meetingType") === "zoom" ? "https://zoom.us/j/..." : "https://teams.microsoft.com/l/..."}
+                          {...field}
+                          data-testid="input-quick-meeting-link"
+                        />
+                      </div>
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Paste your {form.watch("meetingType") === "zoom" ? "Zoom" : "Teams"} meeting link
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="attendees"
