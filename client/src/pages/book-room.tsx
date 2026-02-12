@@ -249,16 +249,6 @@ export default function BookRoom() {
         description={isGuest ? "Book a conference room — no account required" : "Select a room and schedule your meeting"}
         actions={isGuest ? <img src={logoImage} alt="MeetSpace" className="w-48 object-contain" data-testid="img-book-logo" /> : undefined}
       />
-      {isGuest && (
-        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-          <span>Already have an account?</span>
-          <Button variant="outline" size="sm" onClick={() => navigate("/auth")} data-testid="button-goto-login">
-            <LogIn className="w-4 h-4 mr-2" />
-            Sign In
-          </Button>
-        </div>
-      )}
-
       <Form {...form}>
         <form onSubmit={form.handleSubmit((v) => createBooking.mutate(v))} className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
