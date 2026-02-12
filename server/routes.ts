@@ -18,6 +18,7 @@ import {
   listGraphRooms,
   createCalendarEvent,
   cancelCalendarEvent,
+  getCalendarEvents,
   testConnection as testGraphConnection,
 } from "./graph";
 
@@ -739,6 +740,112 @@ export async function registerRoutes(
       res.json({ message: `Sync complete: ${results.created} created, ${results.updated} updated`, ...results });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to sync rooms" });
+    }
+  });
+
+  app.post("/api/graph/import-events", requireAdmin, async (req, res) => {
+    if (!isGraphConfigured()) {
+      return res.status(400).json({ message: "Microsoft Graph credentials not configured" });
+    }
+    try {
+      const { facilityId, daysAhead } = req.body;
+      const days = daysAhead || 30;
+
+      const allRooms = await storage.getRooms();
+      const rooms = allRooms.filter((r) => r.msGraphRoomEmail && (!facilityId || r.facilityId === facilityId));
+
+      if (rooms.length === 0) {
+        return res.json({ message: "No rooms with Microsoft 365 email found", imported: 0, skipped: 0 });
+      }
+
+      const now = new Date();
+      const end = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+      const existingBookings = await storage.getBookings();
+      const existingEventIds = new Set(existingBookings.filter((b) => b.msGraphEventId).map((b) => b.msGraphEventId));
+
+      const results = { imported: 0, skipped: 0, errors: 0 };
+      const adminUserId = req.session.userId as string;
+
+      for (const room of rooms) {
+        try {
+          const events = await getCalendarEvents(room.msGraphRoomEmail!, now, end);
+          for (const event of events) {
+            if (existingEventIds.has(event.id)) {
+              results.skipped++;
+              continue;
+            }
+            if (event.isCancelled) {
+              results.skipped++;
+              continue;
+            }
+
+            const startTime = new Date(event.start?.dateTime + "Z");
+            const endTime = new Date(event.end?.dateTime + "Z");
+            if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+              results.skipped++;
+              continue;
+            }
+
+            const hasConflict = existingBookings.some(
+              (b) =>
+                b.roomId === room.id &&
+                b.status === "confirmed" &&
+                new Date(b.startTime) < endTime &&
+                new Date(b.endTime) > startTime
+            );
+            if (hasConflict) {
+              results.skipped++;
+              continue;
+            }
+
+            let meetingType = "none";
+            if (event.isOnlineMeeting && event.onlineMeetingProvider === "teamsForBusiness") {
+              meetingType = "Teams Meeting";
+            }
+
+            await storage.createBooking({
+              roomId: room.id,
+              userId: adminUserId,
+              title: event.subject || "Imported Meeting",
+              description: `Imported from Outlook calendar. Organizer: ${event.organizer?.emailAddress?.name || event.organizer?.emailAddress?.address || "Unknown"}`,
+              startTime: startTime,
+              endTime: endTime,
+              status: "confirmed",
+              meetingType,
+              attendees: (event.attendees || [])
+                .filter((a: any) => a.type !== "resource")
+                .map((a: any) => a.emailAddress?.address)
+                .filter(Boolean),
+              isRecurring: false,
+              bookedForName: event.organizer?.emailAddress?.name || null,
+              bookedForEmail: event.organizer?.emailAddress?.address || null,
+              msGraphEventId: event.id,
+            });
+
+            existingEventIds.add(event.id);
+            results.imported++;
+          }
+        } catch (err: any) {
+          console.error(`Failed to import events for room ${room.name} (${room.msGraphRoomEmail}):`, err.message);
+          results.errors++;
+        }
+      }
+
+      await storage.createAuditLog({
+        userId: adminUserId,
+        action: "booking_created",
+        entityType: "booking",
+        entityId: facilityId || "all",
+        details: `Imported events from Outlook: ${results.imported} imported, ${results.skipped} skipped, ${results.errors} room errors`,
+      });
+
+      io.emit("bookings:updated");
+      res.json({
+        message: `Import complete: ${results.imported} imported, ${results.skipped} skipped`,
+        ...results,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to import calendar events" });
     }
   });
 
