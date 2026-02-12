@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { LogIn, UserPlus, Clock } from "lucide-react";
-import logoImage from "@assets/image_1770927456023.png";
+import logoImage from "@assets/MeetSpace_full_1770927956368.png";
 import type { Facility } from "@shared/schema";
 
 const loginSchema = z.object({
