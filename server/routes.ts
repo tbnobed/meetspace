@@ -118,20 +118,33 @@ export async function registerRoutes(
     if (existing) {
       return res.status(409).json({ message: "Username already taken" });
     }
-    const existingEmail = await storage.getUserByEmail(parsed.data.email);
-    if (existingEmail) {
-      return res.status(409).json({ message: "An account with this email already exists" });
-    }
     const hashed = await bcrypt.hash(parsed.data.password, 10);
-    const user = await storage.createUser({
-      username: parsed.data.username,
-      password: hashed,
-      displayName: parsed.data.displayName,
-      email: parsed.data.email,
-      role: "user",
-      facilityId: parsed.data.facilityId || null,
-      approved: false,
-    });
+    const existingEmail = await storage.getUserByEmail(parsed.data.email);
+    let user;
+    if (existingEmail && /^.+_\d{10,}$/.test(existingEmail.username)) {
+      user = await storage.updateUser(existingEmail.id, {
+        username: parsed.data.username,
+        password: hashed,
+        displayName: parsed.data.displayName,
+        facilityId: parsed.data.facilityId || existingEmail.facilityId,
+        approved: false,
+      });
+      if (!user) {
+        return res.status(500).json({ message: "Failed to upgrade guest account" });
+      }
+    } else if (existingEmail) {
+      return res.status(409).json({ message: "An account with this email already exists" });
+    } else {
+      user = await storage.createUser({
+        username: parsed.data.username,
+        password: hashed,
+        displayName: parsed.data.displayName,
+        email: parsed.data.email,
+        role: "user",
+        facilityId: parsed.data.facilityId || null,
+        approved: false,
+      });
+    }
     const { password: _, ...safeUser } = user;
 
     const adminEmails = await storage.getAdminEmails();
