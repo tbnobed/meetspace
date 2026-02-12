@@ -5,6 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -30,8 +35,84 @@ import {
   Video,
   CalendarDays,
   Monitor,
+  CheckCircle2,
+  XCircle,
+  HelpCircle,
+  Loader2,
 } from "lucide-react";
 import type { BookingWithDetails } from "@shared/schema";
+
+function RoomStatusBadge({ bookingId }: { bookingId: string }) {
+  const { data, isLoading } = useQuery<{
+    status: string;
+    message?: string;
+    roomEmail?: string;
+  }>({
+    queryKey: ["/api/bookings", bookingId, "room-status"],
+    queryFn: async () => {
+      const res = await fetch(`/api/bookings/${bookingId}/room-status`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    staleTime: 60000,
+    retry: false,
+  });
+
+  if (isLoading) {
+    return (
+      <Badge variant="outline" className="text-[10px] gap-1">
+        <Loader2 className="w-3 h-3 animate-spin" />
+        Checking room...
+      </Badge>
+    );
+  }
+
+  if (!data || data.status === "unavailable") return null;
+
+  const statusConfig: Record<string, { label: string; icon: typeof CheckCircle2; className: string; tooltip: string }> = {
+    accepted: {
+      label: "Room Accepted",
+      icon: CheckCircle2,
+      className: "text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700",
+      tooltip: "The room has accepted this meeting invitation",
+    },
+    declined: {
+      label: "Room Declined",
+      icon: XCircle,
+      className: "text-red-700 dark:text-red-400 border-red-300 dark:border-red-700",
+      tooltip: "The room declined this meeting - it may have a scheduling conflict in Outlook",
+    },
+    tentativelyAccepted: {
+      label: "Tentative",
+      icon: HelpCircle,
+      className: "text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700",
+      tooltip: "The room has tentatively accepted this meeting",
+    },
+    none: {
+      label: "No Response",
+      icon: HelpCircle,
+      className: "text-muted-foreground",
+      tooltip: "The room has not yet responded to this meeting invitation",
+    },
+  };
+
+  const config = statusConfig[data.status] || statusConfig.none;
+  const Icon = config.icon;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="outline" className={`text-[10px] gap-1 ${config.className}`} data-testid={`badge-room-status-${bookingId}`}>
+          <Icon className="w-3 h-3" />
+          {config.label}
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="text-xs">{config.tooltip}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 function BookingCard({ booking }: { booking: BookingWithDetails }) {
   const { toast } = useToast();
@@ -60,6 +141,7 @@ function BookingCard({ booking }: { booking: BookingWithDetails }) {
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-medium text-sm">{booking.title}</h3>
               {isActive && <Badge variant="default" className="text-[10px]">Live</Badge>}
+              {booking.status === "confirmed" && <RoomStatusBadge bookingId={booking.id} />}
             </div>
             {booking.description && (
               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{booking.description}</p>

@@ -75,6 +75,7 @@ All routes prefixed with `/api/`:
 - `GET /api/bookings/range?start=ISO&end=ISO` - Date range query
 - `GET /api/bookings/today` - Today's bookings
 - `PATCH /api/bookings/:id/cancel` - Cancel booking
+- `GET /api/bookings/:id/room-status` - Check room acceptance status from Microsoft 365 (returns accepted/declined/tentativelyAccepted/none)
 
 ### Admin Only
 - `POST /api/facilities`, `PATCH /api/facilities/:id`

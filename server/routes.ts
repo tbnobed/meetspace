@@ -355,30 +355,35 @@ export async function registerRoutes(
   app.get("/api/bookings/:id/room-status", requireAuth, async (req, res) => {
     try {
       if (!isGraphConfigured()) {
-        return res.json({ status: "unavailable", message: "Microsoft 365 integration not configured" });
+        return res.json({ status: "unavailable" });
       }
       const allBookings = await storage.getBookings();
       const booking = allBookings.find((b) => b.id === req.params.id);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const userId = req.session.userId as string;
+      const user = await storage.getUser(userId);
+      const isOwner = booking.userId === userId;
+      const isAdmin = user?.role === "admin" || user?.role === "site_admin";
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
       if (!booking.msGraphEventId) {
-        return res.json({ status: "unavailable", message: "No calendar event linked" });
+        return res.json({ status: "unavailable" });
       }
       const allRooms = await storage.getRooms();
       const room = allRooms.find((r) => r.id === booking.roomId);
       if (!room?.msGraphRoomEmail) {
-        return res.json({ status: "unavailable", message: "Room has no Microsoft 365 email" });
+        return res.json({ status: "unavailable" });
       }
       const details = await getEventDetails(room.msGraphRoomEmail, booking.msGraphEventId);
       if (!details) {
-        return res.json({ status: "unknown", message: "Could not retrieve event details" });
+        return res.json({ status: "unknown" });
       }
-      res.json({
-        status: details.roomResponse,
-        roomEmail: details.roomEmail,
-        attendees: details.attendees,
-      });
+      res.json({ status: details.roomResponse });
     } catch (error: any) {
-      res.json({ status: "error", message: error.message || "Failed to check room status" });
+      res.json({ status: "error" });
     }
   });
 
