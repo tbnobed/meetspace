@@ -238,7 +238,7 @@ function MonthView({
             return (
               <div
                 key={di}
-                className={`min-h-[100px] border-r last:border-r-0 p-1.5 cursor-pointer hover-elevate ${
+                className={`min-h-[140px] border-r last:border-r-0 p-1.5 cursor-pointer hover-elevate ${
                   !isCurrentMonth ? "bg-muted/20" : ""
                 }`}
                 onClick={() => onDayClick(day)}
