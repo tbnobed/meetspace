@@ -9,6 +9,13 @@ Conference room management system for a multi-facility organization with ~20 con
 - **Database**: PostgreSQL with Drizzle ORM
 - **Auth**: Session-based with bcryptjs password hashing and PostgreSQL session store (connect-pg-simple)
 - **Email**: SendGrid integration via @sendgrid/mail for transactional emails
+- **Real-time**: Socket.io for live updates — server emits events on data mutations, client hook invalidates TanStack Query caches
+
+## Real-time Updates (Socket.io)
+- Server: Socket.io server initialized in `server/routes.ts` alongside Express
+- Client: `useSocket` hook in `client/src/hooks/use-socket.ts` listens for events and invalidates relevant query caches
+- Events: `bookings:updated`, `facilities:updated`, `rooms:updated`, `users:updated`
+- Hook is mounted in `AuthenticatedLayout` in App.tsx so all authenticated pages auto-refresh
 
 ## Authentication
 - Login/register at `/auth` page with session-based auth

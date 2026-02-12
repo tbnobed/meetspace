@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import { Server as SocketIOServer } from "socket.io";
 import { storage } from "./storage";
 import { insertFacilitySchema, insertRoomSchema, insertBookingSchema, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
@@ -35,6 +36,14 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  const io = new SocketIOServer(httpServer, {
+    cors: { origin: "*" },
+  });
+
+  io.on("connection", (socket) => {
+    socket.on("disconnect", () => {});
+  });
 
   // ── Auth Routes (public) ──
   app.post("/api/auth/login", async (req, res) => {
@@ -94,6 +103,7 @@ export async function registerRoutes(
       newUserDisplayName: user.displayName,
     }).catch(() => {});
 
+    io.emit("users:updated");
     res.status(201).json({ ...safeUser, pendingApproval: true });
   });
 
@@ -241,6 +251,7 @@ export async function registerRoutes(
       }
     }
 
+    io.emit("bookings:updated");
     res.status(201).json(booking);
   });
 
@@ -300,6 +311,7 @@ export async function registerRoutes(
       }).catch(() => {});
     }
 
+    io.emit("bookings:updated");
     res.json(booking);
   });
 
@@ -325,6 +337,7 @@ export async function registerRoutes(
       entityId: req.params.id as string,
       details: JSON.stringify({ action: "facility_assignments_updated", facilityIds: parsed.data.facilityIds }),
     });
+    io.emit("users:updated");
     res.json(assignments);
   });
 
@@ -342,6 +355,7 @@ export async function registerRoutes(
       entityId: facility.id,
       details: `Created facility: ${facility.name}`,
     });
+    io.emit("facilities:updated");
     res.status(201).json(facility);
   });
 
@@ -355,6 +369,7 @@ export async function registerRoutes(
       entityId: facility.id,
       details: `Updated facility: ${facility.name}`,
     });
+    io.emit("facilities:updated");
     res.json(facility);
   });
 
@@ -371,6 +386,7 @@ export async function registerRoutes(
       entityId: room.id,
       details: `Created room: ${room.name}`,
     });
+    io.emit("rooms:updated");
     res.status(201).json(room);
   });
 
@@ -384,6 +400,7 @@ export async function registerRoutes(
       entityId: room.id,
       details: `Updated room: ${room.name}`,
     });
+    io.emit("rooms:updated");
     res.json(room);
   });
 
@@ -441,6 +458,7 @@ export async function registerRoutes(
         details: JSON.stringify({ username: user.username, displayName: user.displayName, role: user.role }),
       });
       const { password: _, ...safeUser } = user;
+      io.emit("users:updated");
       res.status(201).json(safeUser);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to create user" });
@@ -501,6 +519,7 @@ export async function registerRoutes(
         details: JSON.stringify({ displayName: updated.displayName, role: updated.role }),
       });
       const { password: _, ...safeUser } = updated;
+      io.emit("users:updated");
       res.json(safeUser);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to update user" });
@@ -528,6 +547,7 @@ export async function registerRoutes(
         userId: req.session.userId as string,
         details: JSON.stringify({ username: existing.username, displayName: existing.displayName }),
       });
+      io.emit("users:updated");
       res.json({ message: "User deleted" });
     } catch (error: any) {
       if (error.message?.includes("foreign key")) {
@@ -589,6 +609,7 @@ export async function registerRoutes(
       });
 
       const { password: _, ...safeUser } = user;
+      io.emit("users:updated");
       res.status(201).json({ ...safeUser, emailSent });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to invite user" });

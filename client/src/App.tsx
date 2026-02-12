@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSocket } from "@/hooks/use-socket";
 import Dashboard from "@/pages/dashboard";
 import BookRoom from "@/pages/book-room";
 import MyBookings from "@/pages/my-bookings";
@@ -38,6 +39,7 @@ function AdminRoute({ component: Component }: { component: () => JSX.Element }) 
 
 function AuthenticatedLayout() {
   const { user, isLoading } = useAuth();
+  useSocket();
 
   if (isLoading) {
     return (
