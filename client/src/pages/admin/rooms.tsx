@@ -23,7 +23,7 @@ import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { EQUIPMENT_OPTIONS, getTimezoneAbbr } from "@/lib/constants";
-import { Plus, DoorOpen, Users, Building2, Pencil, RefreshCw, Cloud, Mail, CheckCircle2, Loader2 } from "lucide-react";
+import { Plus, DoorOpen, Users, Building2, Pencil, RefreshCw, Cloud, Mail, CheckCircle2, Loader2, Download, Calendar } from "lucide-react";
 import type { Facility, RoomWithFacility } from "@shared/schema";
 
 const roomFormSchema = z.object({
@@ -389,9 +389,105 @@ function SyncDialog({ facilities, open, onOpenChange }: {
   );
 }
 
+function ImportEventsDialog({ facilities, open, onOpenChange }: {
+  facilities: Facility[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [selectedFacility, setSelectedFacility] = useState("all");
+  const [daysAhead, setDaysAhead] = useState("30");
+
+  const importMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/graph/import-events", {
+        facilityId: selectedFacility === "all" ? undefined : selectedFacility,
+        daysAhead: parseInt(daysAhead) || 30,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      toast({ title: "Import Complete", description: data.message });
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Import Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Calendar className="w-5 h-5" />
+            Import Events from Outlook
+          </DialogTitle>
+          <DialogDescription>
+            Pull meetings from Microsoft 365 room calendars into the app. Events already in the system will be skipped.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Facility</label>
+            <Select value={selectedFacility} onValueChange={setSelectedFacility}>
+              <SelectTrigger className="mt-1" data-testid="select-import-facility">
+                <SelectValue placeholder="All facilities" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Facilities</SelectItem>
+                {facilities.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Time Range</label>
+            <Select value={daysAhead} onValueChange={setDaysAhead}>
+              <SelectTrigger className="mt-1" data-testid="select-import-days">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Next 7 days</SelectItem>
+                <SelectItem value="14">Next 14 days</SelectItem>
+                <SelectItem value="30">Next 30 days</SelectItem>
+                <SelectItem value="60">Next 60 days</SelectItem>
+                <SelectItem value="90">Next 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Only rooms synced from Microsoft 365 (with an M365 email) will be checked. Duplicate and conflicting events are automatically skipped.
+          </p>
+
+          <Button
+            className="w-full"
+            onClick={() => importMutation.mutate()}
+            disabled={importMutation.isPending}
+            data-testid="button-import-events"
+          >
+            {importMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 mr-2" />
+            )}
+            {importMutation.isPending ? "Importing..." : "Import Events"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function AdminRooms() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editRoom, setEditRoom] = useState<RoomWithFacility | undefined>();
 
   const { data: rooms, isLoading: roomsLoading } = useQuery<RoomWithFacility[]>({ queryKey: ["/api/rooms"] });
@@ -425,10 +521,16 @@ export default function AdminRooms() {
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             {graphStatus?.configured && (
-              <Button variant="outline" onClick={() => setSyncDialogOpen(true)} data-testid="button-open-sync">
-                <Cloud className="w-4 h-4 mr-2" />
-                Sync from Microsoft 365
-              </Button>
+              <>
+                <Button variant="outline" onClick={() => setImportDialogOpen(true)} data-testid="button-open-import">
+                  <Download className="w-4 h-4 mr-2" />
+                  Import Events
+                </Button>
+                <Button variant="outline" onClick={() => setSyncDialogOpen(true)} data-testid="button-open-sync">
+                  <Cloud className="w-4 h-4 mr-2" />
+                  Sync Rooms
+                </Button>
+              </>
             )}
             <Button onClick={handleAdd} data-testid="button-add-room">
               <Plus className="w-4 h-4 mr-2" />
@@ -528,11 +630,18 @@ export default function AdminRooms() {
       />
 
       {graphStatus?.configured && (
-        <SyncDialog
-          facilities={facilities || []}
-          open={syncDialogOpen}
-          onOpenChange={setSyncDialogOpen}
-        />
+        <>
+          <SyncDialog
+            facilities={facilities || []}
+            open={syncDialogOpen}
+            onOpenChange={setSyncDialogOpen}
+          />
+          <ImportEventsDialog
+            facilities={facilities || []}
+            open={importDialogOpen}
+            onOpenChange={setImportDialogOpen}
+          />
+        </>
       )}
     </div>
   );

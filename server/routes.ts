@@ -765,6 +765,7 @@ export async function registerRoutes(
 
       const results = { imported: 0, skipped: 0, errors: 0 };
       const adminUserId = req.session.userId as string;
+      const importedIntervals: Map<string, { start: Date; end: Date }[]> = new Map();
 
       for (const room of rooms) {
         try {
@@ -779,21 +780,33 @@ export async function registerRoutes(
               continue;
             }
 
-            const startTime = new Date(event.start?.dateTime + "Z");
-            const endTime = new Date(event.end?.dateTime + "Z");
+            const rawStart = event.start?.dateTime || "";
+            const rawEnd = event.end?.dateTime || "";
+            const startTime = new Date(rawStart.endsWith("Z") ? rawStart : rawStart + "Z");
+            const endTime = new Date(rawEnd.endsWith("Z") ? rawEnd : rawEnd + "Z");
+
             if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
               results.skipped++;
               continue;
             }
 
-            const hasConflict = existingBookings.some(
+            const hasExistingConflict = existingBookings.some(
               (b) =>
                 b.roomId === room.id &&
                 b.status === "confirmed" &&
                 new Date(b.startTime) < endTime &&
                 new Date(b.endTime) > startTime
             );
-            if (hasConflict) {
+            if (hasExistingConflict) {
+              results.skipped++;
+              continue;
+            }
+
+            const roomIntervals = importedIntervals.get(room.id) || [];
+            const hasBatchConflict = roomIntervals.some(
+              (interval) => interval.start < endTime && interval.end > startTime
+            );
+            if (hasBatchConflict) {
               results.skipped++;
               continue;
             }
@@ -823,6 +836,8 @@ export async function registerRoutes(
             });
 
             existingEventIds.add(event.id);
+            roomIntervals.push({ start: startTime, end: endTime });
+            importedIntervals.set(room.id, roomIntervals);
             results.imported++;
           }
         } catch (err: any) {

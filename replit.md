@@ -109,8 +109,14 @@ All routes prefixed with `/api/`:
 - **Event cancellation**: Cancelling a booking also cancels the corresponding Outlook calendar event
 - **Schema fields**: `msGraphRoomEmail` on rooms table, `msGraphEventId` on bookings table
 - **Admin UI**: "Sync from Microsoft 365" button on Room Management page when Graph is configured
+- **Event import**: Admin can pull existing Outlook calendar events into the app from M365 room calendars
+  - Deduplication: Events already imported (by msGraphEventId) are skipped
+  - Conflict detection: Events conflicting with existing bookings are skipped
+  - Organizer info stored in bookedForName/bookedForEmail
+  - Configurable time range (7-90 days ahead) and optional facility filter
 - **API routes** (admin only):
   - `GET /api/graph/status` - Check if Graph credentials are configured
   - `POST /api/graph/test` - Test connection to Microsoft Graph
   - `GET /api/graph/rooms` - List room resources from Microsoft 365
   - `POST /api/graph/sync-rooms` - Import/update rooms from M365 into a facility
+  - `POST /api/graph/import-events` - Import calendar events from M365 room calendars as bookings

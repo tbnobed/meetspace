@@ -206,10 +206,18 @@ export async function getCalendarEvents(
 ): Promise<any[]> {
   const start = startTime.toISOString();
   const end = endTime.toISOString();
-  const data = await graphFetch(
-    `/users/${roomEmail}/calendarView?startDateTime=${start}&endDateTime=${end}&$top=100`
-  );
-  return data.value || [];
+  const allEvents: any[] = [];
+  let url: string | null = `/users/${roomEmail}/calendarView?startDateTime=${start}&endDateTime=${end}&$top=50&$select=id,subject,start,end,organizer,attendees,isOnlineMeeting,onlineMeetingProvider,isCancelled`;
+  while (url) {
+    const data = await graphFetch(url, {
+      headers: { Prefer: 'outlook.timezone="UTC"' },
+    });
+    if (data.value) {
+      allEvents.push(...data.value);
+    }
+    url = data["@odata.nextLink"] || null;
+  }
+  return allEvents;
 }
 
 export async function testConnection(): Promise<{ success: boolean; message: string; roomCount?: number }> {
