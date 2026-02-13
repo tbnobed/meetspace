@@ -251,7 +251,7 @@ export default function BookRoom() {
       <PageHeader
         title="Book a Room"
         description={isGuest ? "Book a conference room — no account required" : "Select a room and schedule your meeting"}
-        actions={isGuest ? <img src={logoImage} alt="MeetSpace" className="w-48 object-contain" data-testid="img-book-logo" /> : undefined}
+        actions={isGuest ? <img src={logoImage} alt="MeetSpace" className="w-32 sm:w-48 object-contain" data-testid="img-book-logo" /> : undefined}
       />
       <Form {...form}>
         <form onSubmit={form.handleSubmit((v) => createBooking.mutate(v))} className="space-y-6">
@@ -619,7 +619,7 @@ export default function BookRoom() {
 
   if (isGuest) {
     return (
-      <div className="min-h-screen bg-background p-6 max-w-7xl mx-auto">
+      <div className="min-h-screen bg-background p-3 sm:p-6 max-w-7xl mx-auto">
         {content}
       </div>
     );

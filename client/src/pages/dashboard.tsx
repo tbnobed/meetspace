@@ -219,13 +219,13 @@ function getBookingsForDay(bookings: BookingWithDetails[], day: Date): BookingWi
 function StatCard({ title, value, icon, subtitle }: { title: string; value: string | number; icon: React.ReactNode; subtitle?: string }) {
   return (
     <Card data-testid={`stat-${title.toLowerCase().replace(/\s+/g, "-")}`}>
-      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
+        <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">{title}</CardTitle>
         <div className="text-muted-foreground">{icon}</div>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
+      <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+        <div className="text-xl sm:text-2xl font-bold">{value}</div>
+        {subtitle && <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 hidden sm:block">{subtitle}</p>}
       </CardContent>
     </Card>
   );
@@ -690,7 +690,7 @@ export default function Dashboard() {
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
         <StatCard
           title="Total Facilities"
           value={facilities?.length || 0}
@@ -717,23 +717,23 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-4">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <Button variant="outline" size="icon" onClick={navigatePrev} data-testid="button-calendar-prev">
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <Button variant="outline" onClick={goToToday} data-testid="button-calendar-today">
+          <Button variant="outline" size="sm" onClick={goToToday} data-testid="button-calendar-today">
             Today
           </Button>
           <Button variant="outline" size="icon" onClick={navigateNext} data-testid="button-calendar-next">
             <ChevronRight className="w-4 h-4" />
           </Button>
-          <h2 className="text-lg font-semibold ml-2" data-testid="text-calendar-header">{headerText}</h2>
+          <h2 className="text-sm sm:text-lg font-semibold ml-1 sm:ml-2 truncate" data-testid="text-calendar-header">{headerText}</h2>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <Select value={facilityFilter} onValueChange={setFacilityFilter}>
-            <SelectTrigger className="w-[180px]" data-testid="select-calendar-facility">
+            <SelectTrigger className="w-[120px] sm:w-[180px]" data-testid="select-calendar-facility">
               <SelectValue placeholder="All Facilities" />
             </SelectTrigger>
             <SelectContent>
@@ -749,7 +749,7 @@ export default function Dashboard() {
               variant={viewMode === "month" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("month")}
-              className="rounded-r-none"
+              className="rounded-r-none text-xs sm:text-sm"
               data-testid="button-view-month"
             >
               Month
@@ -758,7 +758,7 @@ export default function Dashboard() {
               variant={viewMode === "week" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("week")}
-              className="rounded-none border-x"
+              className="rounded-none border-x text-xs sm:text-sm"
               data-testid="button-view-week"
             >
               Week
@@ -767,7 +767,7 @@ export default function Dashboard() {
               variant={viewMode === "day" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("day")}
-              className="rounded-l-none"
+              className="rounded-l-none text-xs sm:text-sm"
               data-testid="button-view-day"
             >
               Day

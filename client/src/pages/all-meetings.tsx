@@ -458,17 +458,20 @@ export default function AllMeetings() {
       />
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList data-testid="tabs-facility-filter">
-          <TabsTrigger value="all" data-testid="tab-all">All Facilities</TabsTrigger>
-          {facilities?.map((f) => (
-            <TabsTrigger key={f.id} value={f.id} data-testid={`tab-${f.name.toLowerCase().replace(/\s+/g, "-")}`}>
-              {f.name}
-              <Badge variant="secondary" className="ml-1.5 text-[10px]">
-                {getTimezoneAbbr(f.timezone)}
-              </Badge>
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex w-auto min-w-full sm:min-w-0" data-testid="tabs-facility-filter">
+            <TabsTrigger value="all" data-testid="tab-all">All</TabsTrigger>
+            {facilities?.map((f) => (
+              <TabsTrigger key={f.id} value={f.id} className="whitespace-nowrap" data-testid={`tab-${f.name.toLowerCase().replace(/\s+/g, "-")}`}>
+                <span className="hidden sm:inline">{f.name}</span>
+                <span className="sm:hidden">{f.name.split(' ')[0]}</span>
+                <Badge variant="secondary" className="ml-1 sm:ml-1.5 text-[10px]">
+                  {getTimezoneAbbr(f.timezone)}
+                </Badge>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
 
         <TabsContent value="all" className="mt-4">
           <ScrollArea className="w-full">

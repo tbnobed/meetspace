@@ -62,12 +62,12 @@ function AuthenticatedLayout() {
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
-          <header className="flex items-center justify-between gap-2 p-2 border-b sticky top-0 bg-background z-50">
+          <header className="flex items-center justify-between gap-2 px-3 py-2 border-b sticky top-0 bg-background z-50">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <ThemeToggle />
           </header>
           <ScrollArea className="flex-1">
-            <main className="p-6 max-w-7xl mx-auto w-full">
+            <main className="p-3 sm:p-6 max-w-7xl mx-auto w-full">
               <Switch>
                 <Route path="/">{() => <ProtectedRoute component={Dashboard} />}</Route>
                 <Route path="/rooms">{() => <ProtectedRoute component={AllMeetings} />}</Route>

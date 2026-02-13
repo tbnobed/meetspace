@@ -94,7 +94,7 @@ export default function AuthPage() {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="w-full max-w-md">
           <div className="flex items-center justify-center mb-8">
-            <img src={logoImage} alt="MeetSpace Manager" className="w-80 object-contain" data-testid="img-auth-logo" />
+            <img src={logoImage} alt="MeetSpace Manager" className="w-56 sm:w-80 object-contain" data-testid="img-auth-logo" />
           </div>
 
           <Card>
@@ -127,8 +127,8 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center mb-8">
-          <img src={logoImage} alt="MeetSpace Manager" className="w-80 object-contain" data-testid="img-auth-logo" />
+        <div className="flex items-center justify-center mb-6 sm:mb-8">
+          <img src={logoImage} alt="MeetSpace Manager" className="w-56 sm:w-80 object-contain" data-testid="img-auth-logo" />
         </div>
 
         <Card>
