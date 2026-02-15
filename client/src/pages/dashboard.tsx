@@ -327,7 +327,7 @@ function MonthView({
                           {formatTime(b.startTime).replace(/:00/g, "")} {b.title}
                         </div>
                       </TooltipTrigger>
-                      <TooltipContent side="right" align="start">
+                      <TooltipContent side="right" align="start" className="z-[100] p-3">
                         <BookingTooltipContent booking={b} />
                       </TooltipContent>
                     </Tooltip>
@@ -438,7 +438,7 @@ function WeekView({
                             )}
                           </div>
                         </TooltipTrigger>
-                        <TooltipContent side="right" align="start">
+                        <TooltipContent side="right" align="start" className="z-[100] p-3">
                           <BookingTooltipContent booking={b} />
                         </TooltipContent>
                       </Tooltip>
@@ -551,7 +551,7 @@ function DayView({
                         )}
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent side="right" align="start">
+                    <TooltipContent side="right" align="start" className="z-[100] p-3">
                       <BookingTooltipContent booking={b} />
                     </TooltipContent>
                   </Tooltip>
