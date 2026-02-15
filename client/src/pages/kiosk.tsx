@@ -575,7 +575,7 @@ export default function KioskDisplay() {
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className={`w-3 flex-shrink-0 ${isAvailable ? "bg-green-500" : "bg-red-500"}`} data-testid="bar-kiosk-status" />
+        <div className={`w-9 flex-shrink-0 ${isAvailable ? "bg-green-500" : "bg-red-500"}`} data-testid="bar-kiosk-status" />
         <div className="flex-1 flex flex-col p-6 gap-4 justify-center">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="space-y-1">
