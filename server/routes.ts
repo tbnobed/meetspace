@@ -732,27 +732,28 @@ export async function registerRoutes(
       }
       const allBookings = await storage.getBookings();
       const userBookings = allBookings.filter((b) => b.userId === id && b.status !== "cancelled");
-      if (userBookings.length > 0) {
-        return res.status(409).json({ message: "Cannot delete user with existing bookings. Cancel their bookings first." });
+      for (const booking of userBookings) {
+        await storage.cancelBooking(booking.id);
       }
       await storage.nullifyAuditLogUser(id);
       const deleted = await storage.deleteUser(id);
       if (!deleted) {
         return res.status(500).json({ message: "Failed to delete user" });
       }
+      const cancelledCount = userBookings.length;
       await storage.createAuditLog({
         action: "user_deleted",
         entityType: "user",
         entityId: id,
         userId: req.session.userId as string,
-        details: JSON.stringify({ username: existing.username, displayName: existing.displayName }),
+        details: JSON.stringify({ username: existing.username, displayName: existing.displayName, cancelledBookings: cancelledCount }),
       });
       io.emit("users:updated");
-      res.json({ message: "User deleted" });
-    } catch (error: any) {
-      if (error.message?.includes("foreign key")) {
-        return res.status(409).json({ message: "Cannot delete user with existing bookings. Cancel their bookings first." });
+      if (cancelledCount > 0) {
+        io.emit("bookings:updated");
       }
+      res.json({ message: cancelledCount > 0 ? `User deleted and ${cancelledCount} booking(s) were automatically cancelled.` : "User deleted" });
+    } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to delete user" });
     }
   });
