@@ -185,7 +185,7 @@ export async function registerRoutes(
     res.json(safeUser);
   });
 
-  // ── Public Routes (with site_admin filtering) ──
+  // ── Public Routes (with role-based facility filtering) ──
   app.get("/api/facilities", async (req, res) => {
     if (req.session.userId) {
       const user = await storage.getUser(req.session.userId);
@@ -193,6 +193,10 @@ export async function registerRoutes(
         const assignments = await storage.getUserFacilityAssignments(user.id);
         const facilityIds = assignments.map((a) => a.facilityId);
         const result = await storage.getFacilitiesByIds(facilityIds);
+        return res.json(result);
+      }
+      if (user && user.role === "user" && user.facilityId) {
+        const result = await storage.getFacilitiesByIds([user.facilityId]);
         return res.json(result);
       }
     }
@@ -207,6 +211,10 @@ export async function registerRoutes(
         const assignments = await storage.getUserFacilityAssignments(user.id);
         const facilityIds = assignments.map((a) => a.facilityId);
         const result = await storage.getRoomsByFacilityIds(facilityIds);
+        return res.json(result);
+      }
+      if (user && user.role === "user" && user.facilityId) {
+        const result = await storage.getRoomsByFacilityIds([user.facilityId]);
         return res.json(result);
       }
     }
@@ -370,6 +378,11 @@ export async function registerRoutes(
       return res.json(result);
     }
 
+    if (user.facilityId) {
+      const result = await storage.getBookingsByFacilityIds([user.facilityId]);
+      return res.json(result);
+    }
+
     const result = await storage.getBookingsByUserId(user.id);
     res.json(result);
   });
@@ -391,6 +404,9 @@ export async function registerRoutes(
       const facilityIds = assignments.map((a) => a.facilityId);
       return res.json(result.filter((b) => facilityIds.includes(b.room.facilityId)));
     }
+    if (user && user.role === "user" && user.facilityId) {
+      return res.json(result.filter((b) => b.room.facilityId === user.facilityId));
+    }
     res.json(result);
   });
 
@@ -403,8 +419,11 @@ export async function registerRoutes(
       const filtered = allToday.filter((b) => facilityIds.includes(b.room.facilityId));
       return res.json(filtered);
     }
-    const result = await storage.getTodayBookings();
-    res.json(result);
+    const allToday = await storage.getTodayBookings();
+    if (user && user.role === "user" && user.facilityId) {
+      return res.json(allToday.filter((b) => b.room.facilityId === user.facilityId));
+    }
+    res.json(allToday);
   });
 
   app.get("/api/bookings/:id", requireAuth, async (req, res) => {
