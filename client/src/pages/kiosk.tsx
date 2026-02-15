@@ -554,7 +554,7 @@ export default function KioskDisplay() {
   const tz = status.room.timezone;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="dark min-h-screen flex flex-col bg-background text-foreground">
       <div className={`flex items-center justify-between gap-4 px-8 py-6 ${isAvailable ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"}`}>
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold" data-testid="text-kiosk-room-name">{status.room.name}</h1>
