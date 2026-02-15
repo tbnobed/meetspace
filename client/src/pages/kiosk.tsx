@@ -631,28 +631,28 @@ export default function KioskDisplay() {
             )}
           </div>
 
-          <div className="relative flex gap-3 pt-6">
+          <div className="relative flex gap-5 pt-8 pb-4">
             {isAvailable && (
               <Button
                 size="lg"
-                className="text-white border-transparent"
+                className="text-white border-transparent text-lg px-8 py-6"
                 style={{ background: "linear-gradient(135deg, #334155, #475569, #3b4f6b)" }}
                 onClick={() => setBookDialogOpen(true)}
                 data-testid="button-kiosk-book"
               >
-                <Plus className="w-5 h-5 mr-2" />
+                <Plus className="w-6 h-6 mr-2" />
                 Book Now
               </Button>
             )}
             <Button
               size="lg"
               variant="outline"
-              className="text-white border-slate-500"
+              className="text-white border-slate-500 text-lg px-8 py-6"
               style={{ background: "linear-gradient(135deg, #1e293b, #334155, #2a3a4f)" }}
               onClick={() => setScheduleDialogOpen(true)}
               data-testid="button-kiosk-schedule"
             >
-              <CalendarPlus className="w-5 h-5 mr-2" />
+              <CalendarPlus className="w-6 h-6 mr-2" />
               Schedule
             </Button>
           </div>
