@@ -32,14 +32,16 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 })();
 " 2>&1 || true
 
-echo "Clearing orphaned user assignments on imported bookings..."
+echo "Clearing orphaned user assignments on auto-synced bookings..."
 node -e "
 const pg = require('pg');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 (async () => {
   try {
-    const res = await pool.query(\"UPDATE bookings SET user_id = NULL WHERE ms_graph_event_id IS NOT NULL AND user_id IS NOT NULL\");
-    console.log('Cleared user_id on ' + res.rowCount + ' imported booking(s).');
+    const res = await pool.query(
+      \"UPDATE bookings SET user_id = NULL WHERE ms_graph_event_id IS NOT NULL AND user_id IS NOT NULL AND description LIKE 'Auto-synced from Outlook%'\"
+    );
+    console.log('Cleared user_id on ' + res.rowCount + ' auto-synced booking(s).');
   } catch(e) { console.log('imported bookings cleanup:', e.message); }
   pool.end();
 })();
