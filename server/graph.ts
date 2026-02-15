@@ -230,11 +230,11 @@ export async function getEventDetails(
 } | null> {
   try {
     const event = await graphFetch(
-      `/users/${userOrRoomEmail}/events/${eventId}?$select=attendees`
+      `/users/${userOrRoomEmail}/events/${eventId}?$select=attendees,responseStatus,isCancelled`
     );
-    if (!event || !event.attendees) return null;
+    if (!event) return null;
 
-    const attendees = event.attendees.map((a: any) => ({
+    const attendees = (event.attendees || []).map((a: any) => ({
       email: a.emailAddress?.address || "",
       name: a.emailAddress?.name || "",
       type: a.type || "required",
@@ -242,12 +242,31 @@ export async function getEventDetails(
     }));
 
     const roomAttendee = attendees.find((a: any) => a.type === "resource");
+
+    let roomResponse = roomAttendee?.response || "none";
+
+    if (roomResponse === "none" && event.responseStatus?.response) {
+      const calendarOwnerResponse = event.responseStatus.response;
+      if (calendarOwnerResponse === "organizer") {
+        roomResponse = "accepted";
+      } else if (calendarOwnerResponse !== "none") {
+        roomResponse = calendarOwnerResponse;
+      }
+    }
+
+    if (roomResponse === "none" && !event.isCancelled) {
+      roomResponse = "accepted";
+    }
+
     return {
-      roomResponse: roomAttendee?.response || "none",
-      roomEmail: roomAttendee?.email || null,
+      roomResponse,
+      roomEmail: roomAttendee?.email || userOrRoomEmail,
       attendees,
     };
   } catch (error: any) {
+    if (error.message?.includes("404")) {
+      return { roomResponse: "declined", roomEmail: userOrRoomEmail, attendees: [] };
+    }
     console.error(`Failed to get event details for ${eventId}:`, error.message);
     return null;
   }
