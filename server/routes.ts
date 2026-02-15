@@ -18,6 +18,7 @@ import {
   listGraphRooms,
   createCalendarEvent,
   cancelCalendarEvent,
+  updateCalendarEvent,
   getCalendarEvents,
   getEventDetails,
   testConnection as testGraphConnection,
@@ -437,6 +438,113 @@ export async function registerRoutes(
     const booking = await storage.getBooking(req.params.id as string);
     if (!booking) return res.status(404).json({ message: "Booking not found" });
     res.json(booking);
+  });
+
+  app.patch("/api/bookings/:id", requireAuth, async (req, res) => {
+    try {
+      const bookingId = req.params.id as string;
+      const userId = req.session.userId as string;
+      const user = await storage.getUser(userId);
+      const existing = await storage.getBooking(bookingId);
+      if (!existing) return res.status(404).json({ message: "Booking not found" });
+
+      const isOwner = existing.userId === userId;
+      const isAdmin = user?.role === "admin";
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ message: "You can only edit your own bookings" });
+      }
+
+      if (existing.status === "cancelled") {
+        return res.status(400).json({ message: "Cannot edit a cancelled booking" });
+      }
+
+      const { title, description, startTime, endTime, meetingType, meetingLink, attendees } = req.body;
+      const updateData: Record<string, any> = {};
+
+      if (title !== undefined) updateData.title = title;
+      if (description !== undefined) updateData.description = description;
+      if (meetingType !== undefined) updateData.meetingType = meetingType;
+      if (meetingLink !== undefined) updateData.meetingLink = meetingLink;
+      if (attendees !== undefined) updateData.attendees = attendees;
+
+      if (startTime !== undefined || endTime !== undefined) {
+        const room = await storage.getRoom(existing.roomId);
+        const facility = room ? await storage.getFacility(room.facilityId) : null;
+        const tz = facility?.timezone || "America/Los_Angeles";
+
+        let newStart = existing.startTime;
+        let newEnd = existing.endTime;
+
+        const toUTC = (localDateTimeStr: string, timezone: string): Date => {
+          const testDate = new Date(localDateTimeStr);
+          if (isNaN(testDate.getTime())) throw new Error("Invalid date format");
+          const utcStr = testDate.toLocaleString("en-US", { timeZone: "UTC" });
+          const tzStr = testDate.toLocaleString("en-US", { timeZone: timezone });
+          const utcDate = new Date(utcStr);
+          const tzDate = new Date(tzStr);
+          const offset = tzDate.getTime() - utcDate.getTime();
+          return new Date(testDate.getTime() - offset);
+        };
+
+        if (startTime) {
+          try { newStart = toUTC(startTime, tz); }
+          catch { return res.status(400).json({ message: "Invalid start time" }); }
+        }
+        if (endTime) {
+          try { newEnd = toUTC(endTime, tz); }
+          catch { return res.status(400).json({ message: "Invalid end time" }); }
+        }
+
+        if (newEnd <= newStart) {
+          return res.status(400).json({ message: "End time must be after start time" });
+        }
+
+        const conflict = await storage.checkConflict(existing.roomId, newStart, newEnd, existing.id);
+        if (conflict) {
+          return res.status(409).json({ message: "This time conflicts with another booking" });
+        }
+
+        updateData.startTime = newStart;
+        updateData.endTime = newEnd;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: "No fields to update" });
+      }
+
+      const updated = await storage.updateBooking(existing.id, updateData);
+      if (!updated) return res.status(500).json({ message: "Failed to update booking" });
+
+      await storage.createAuditLog({
+        userId,
+        action: "booking_modified",
+        entityType: "booking",
+        entityId: updated.id,
+        details: `Updated booking: ${updated.title}`,
+      });
+
+      if (isGraphConfigured() && existing.msGraphEventId && existing.room.msGraphRoomEmail) {
+        try {
+          await updateCalendarEvent({
+            roomEmail: existing.room.msGraphRoomEmail,
+            eventId: existing.msGraphEventId,
+            subject: updateData.title,
+            startTime: updateData.startTime,
+            endTime: updateData.endTime,
+            body: updateData.description,
+            attendees: updateData.attendees,
+          });
+        } catch (graphErr: any) {
+          console.error("Failed to update Graph calendar event:", graphErr.message);
+        }
+      }
+
+      io.emit("bookings:updated");
+      res.json(updated);
+    } catch (err: any) {
+      console.error("Error updating booking:", err);
+      res.status(500).json({ message: err.message || "Failed to update booking" });
+    }
   });
 
   app.patch("/api/bookings/:id/cancel", requireAuth, async (req, res) => {

@@ -193,6 +193,38 @@ export async function createCalendarEvent(params: CreateEventParams): Promise<{ 
   };
 }
 
+export async function updateCalendarEvent(params: {
+  roomEmail: string;
+  eventId: string;
+  subject?: string;
+  startTime?: Date;
+  endTime?: Date;
+  body?: string;
+  attendees?: string[];
+}): Promise<void> {
+  const { roomEmail, eventId, subject, startTime, endTime, body, attendees } = params;
+  const eventData: any = {};
+
+  if (subject) eventData.subject = subject;
+  if (startTime) eventData.start = { dateTime: startTime.toISOString(), timeZone: "UTC" };
+  if (endTime) eventData.end = { dateTime: endTime.toISOString(), timeZone: "UTC" };
+  if (body !== undefined) eventData.body = { contentType: "text", content: body };
+  if (attendees) {
+    eventData.attendees = [
+      { type: "resource", emailAddress: { address: roomEmail, name: "Conference Room" } },
+      ...attendees.filter(e => e && e.includes("@")).map(email => ({
+        type: "required",
+        emailAddress: { address: email },
+      })),
+    ];
+  }
+
+  await graphFetch(`/users/${roomEmail}/events/${eventId}`, {
+    method: "PATCH",
+    body: JSON.stringify(eventData),
+  });
+}
+
 export async function cancelCalendarEvent(roomEmail: string, eventId: string): Promise<void> {
   await graphFetch(`/users/${roomEmail}/events/${eventId}`, {
     method: "DELETE",
