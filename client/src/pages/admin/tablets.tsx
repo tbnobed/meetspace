@@ -316,6 +316,7 @@ export default function AdminTablets() {
       )}
 
       <TabletFormDialog
+        key={editTablet?.id || "new"}
         tablet={editTablet}
         rooms={rooms || []}
         open={dialogOpen}
