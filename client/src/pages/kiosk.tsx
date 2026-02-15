@@ -555,19 +555,19 @@ export default function KioskDisplay() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <div className={`flex items-center justify-between gap-2 px-6 py-3 ${isAvailable ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"}`}>
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold" data-testid="text-kiosk-room-name">{status.room.name}</h1>
-          <span className="opacity-60">|</span>
-          <span className="text-sm font-medium" data-testid="text-kiosk-facility">{status.room.facilityName}</span>
-          <div className="flex items-center gap-1 text-sm opacity-75">
-            <Users className="w-4 h-4" />
+      <div className={`flex items-center justify-between gap-4 px-8 py-6 ${isAvailable ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"}`}>
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold" data-testid="text-kiosk-room-name">{status.room.name}</h1>
+          <span className="opacity-60 text-xl">|</span>
+          <span className="text-base font-medium" data-testid="text-kiosk-facility">{status.room.facilityName}</span>
+          <div className="flex items-center gap-1 text-base opacity-75">
+            <Users className="w-5 h-5" />
             {status.room.capacity}
             {status.room.floor && <span className="ml-1">Floor {status.room.floor}</span>}
           </div>
         </div>
-        <div className="flex items-center gap-3 text-sm">
-          <Clock className="w-4 h-4 opacity-60" />
+        <div className="flex items-center gap-4 text-base">
+          <Clock className="w-5 h-5 opacity-60" />
           <CurrentTime timezone={tz} />
           <Button
             size="icon"
@@ -575,7 +575,7 @@ export default function KioskDisplay() {
             onClick={handleLogout}
             data-testid="button-kiosk-logout"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-5 h-5" />
           </Button>
         </div>
       </div>
