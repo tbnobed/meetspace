@@ -47,5 +47,27 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 })();
 " 2>&1 || true
 
+echo "Ensuring room_tablets table exists..."
+node -e "
+const pg = require('pg');
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+(async () => {
+  try {
+    await pool.query(\`
+      CREATE TABLE IF NOT EXISTS room_tablets (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        room_id VARCHAR NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+        username VARCHAR NOT NULL UNIQUE,
+        password VARCHAR NOT NULL,
+        display_name VARCHAR NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT true
+      )
+    \`);
+    console.log('room_tablets table ensured.');
+  } catch(e) { console.log('room_tablets check:', e.message); }
+  pool.end();
+})();
+" 2>&1 || true
+
 echo "Starting MeetSpace Manager..."
 exec node dist/index.cjs
