@@ -43,7 +43,10 @@ Conference room management system for a multi-facility organization with ~20 con
 - `/admin/facilities` - Facility CRUD management (admin only)
 - `/admin/users` - User CRUD management (admin only)
 - `/admin/webhooks` - Calendar webhook subscription management (admin only)
+- `/admin/tablets` - Tablet kiosk credential management (admin only)
 - `/admin/audit` - Audit log viewer (admin only)
+- `/tablet` - Tablet kiosk login page (public)
+- `/kiosk` - Tablet kiosk room status display (requires tablet auth)
 
 ## Data Model
 - **Facilities**: 4 locations (Tustin/PST, Nashville/CST, Plex-Dallas/CST, Heritage-Dallas/CST)
@@ -51,6 +54,7 @@ Conference room management system for a multi-facility organization with ~20 con
 - **Bookings**: Time-slot bookings with conflict detection, meeting type (Teams/Zoom/None), optional bookedForName/bookedForEmail for site admin bookings
 - **Users**: Admin, user, and site_admin roles, bcrypt-hashed passwords, `approved` boolean (default false for self-registration, true for admin-created/guest users)
 - **User Facility Assignments**: Junction table mapping site_admin users to their assigned facilities (many-to-many)
+- **Room Tablets**: Tablet kiosk credentials per room (username, password, displayName, isActive)
 - **Audit Logs**: Track all system changes
 
 ## Running
