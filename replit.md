@@ -57,6 +57,15 @@ Conference room management system for a multi-facility organization with ~20 con
 - **Room Tablets**: Tablet kiosk credentials per room (username, password, displayName, isActive)
 - **Audit Logs**: Track all system changes
 
+## PWA (Progressive Web App)
+- Tablet kiosk is installable as an app on iPad (iOS) and Android tablets
+- Web app manifest at `client/public/manifest.json` with standalone display, landscape orientation
+- Service worker at `client/public/sw.js` with network-first caching strategy
+- PWA icons at `client/public/icons/` (192x192 and 512x512)
+- Install prompt/banner shown on tablet login page (`/tablet`) for both Android (native prompt) and iOS (Safari share hint)
+- Meta tags: apple-mobile-web-app-capable, theme-color, mobile-web-app-capable
+- When installed, the app launches in full-screen standalone mode starting at `/tablet`
+
 ## Running
 - `npm run dev` starts Express + Vite dev server on port 5000
 - Database schema auto-pushed and seeded on startup
