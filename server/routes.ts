@@ -1150,5 +1150,267 @@ export async function registerRoutes(
     }
   });
 
+  // ── Tablet Routes ──
+
+  function requireTabletAuth(req: Request, res: Response, next: NextFunction) {
+    if (!req.session.tabletId || !req.session.tabletRoomId) {
+      return res.status(401).json({ message: "Tablet authentication required" });
+    }
+    next();
+  }
+
+  app.post("/api/tablet/login", async (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ message: "Username and password are required" });
+    }
+    const tablet = await storage.getRoomTabletByUsername(username);
+    if (!tablet || !tablet.isActive) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+    const valid = await bcrypt.compare(password, tablet.password);
+    if (!valid) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+    req.session.tabletId = tablet.id;
+    req.session.tabletRoomId = tablet.roomId;
+    const room = await storage.getRoom(tablet.roomId);
+    res.json({
+      tabletId: tablet.id,
+      roomId: tablet.roomId,
+      displayName: tablet.displayName,
+      room: room || null,
+    });
+  });
+
+  app.post("/api/tablet/logout", (req, res) => {
+    req.session.destroy(() => {});
+    res.json({ message: "Logged out" });
+  });
+
+  app.get("/api/tablet/me", requireTabletAuth, async (req, res) => {
+    const tablet = await storage.getRoomTablet(req.session.tabletId as string);
+    if (!tablet) return res.status(401).json({ message: "Tablet not found" });
+    const room = await storage.getRoom(tablet.roomId);
+    res.json({
+      tabletId: tablet.id,
+      roomId: tablet.roomId,
+      displayName: tablet.displayName,
+      room: room || null,
+    });
+  });
+
+  app.get("/api/tablet/room-status", requireTabletAuth, async (req, res) => {
+    const roomId = req.session.tabletRoomId as string;
+    const room = await storage.getRoom(roomId);
+    if (!room) return res.status(404).json({ message: "Room not found" });
+
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const allBookings = await storage.getBookingsByRange(todayStart, todayEnd);
+    const roomBookings = allBookings
+      .filter((b) => b.roomId === roomId && b.status === "confirmed")
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+    const currentMeeting = roomBookings.find(
+      (b) => new Date(b.startTime) <= now && new Date(b.endTime) > now
+    );
+
+    const upcomingMeetings = roomBookings.filter(
+      (b) => new Date(b.startTime) > now
+    );
+
+    const nextMeeting = upcomingMeetings[0] || null;
+
+    let availableUntil: Date | null = null;
+    if (!currentMeeting && nextMeeting) {
+      availableUntil = new Date(nextMeeting.startTime);
+    }
+
+    let status: "available" | "occupied" | "upcoming" = "available";
+    if (currentMeeting) {
+      status = "occupied";
+    } else if (nextMeeting) {
+      const minutesUntilNext = (new Date(nextMeeting.startTime).getTime() - now.getTime()) / 60000;
+      if (minutesUntilNext <= 10) {
+        status = "upcoming";
+      }
+    }
+
+    res.json({
+      room: {
+        id: room.id,
+        name: room.name,
+        capacity: room.capacity,
+        floor: room.floor,
+        equipment: room.equipment,
+        facilityName: room.facility?.name || "Unknown",
+        timezone: room.facility?.timezone || "America/Los_Angeles",
+      },
+      status,
+      currentMeeting: currentMeeting ? {
+        id: currentMeeting.id,
+        title: currentMeeting.title,
+        startTime: currentMeeting.startTime,
+        endTime: currentMeeting.endTime,
+        meetingType: currentMeeting.meetingType,
+        organizer: currentMeeting.bookedForName || currentMeeting.user?.displayName || "Unknown",
+      } : null,
+      nextMeeting: nextMeeting ? {
+        id: nextMeeting.id,
+        title: nextMeeting.title,
+        startTime: nextMeeting.startTime,
+        endTime: nextMeeting.endTime,
+        meetingType: nextMeeting.meetingType,
+        organizer: nextMeeting.bookedForName || nextMeeting.user?.displayName || "Unknown",
+      } : null,
+      availableUntil,
+      upcomingCount: upcomingMeetings.length,
+      todayTotal: roomBookings.length,
+    });
+  });
+
+  app.post("/api/tablet/book", requireTabletAuth, async (req, res) => {
+    const roomId = req.session.tabletRoomId as string;
+    const { title, duration, organizerName } = req.body;
+
+    if (!duration || ![15, 30, 45, 60].includes(duration)) {
+      return res.status(400).json({ message: "Duration must be 15, 30, 45, or 60 minutes" });
+    }
+
+    const now = new Date();
+    const startTime = new Date(Math.ceil(now.getTime() / (5 * 60000)) * (5 * 60000));
+    const endTime = new Date(startTime.getTime() + duration * 60000);
+
+    const hasConflict = await storage.checkConflict(roomId, startTime, endTime);
+    if (hasConflict) {
+      return res.status(409).json({ message: "Room is not available for the requested time" });
+    }
+
+    const room = await storage.getRoom(roomId);
+
+    try {
+      const booking = await storage.createBooking({
+        roomId,
+        userId: null,
+        title: title || "Walk-in Booking",
+        description: `Booked from room tablet${organizerName ? ` by ${organizerName}` : ""}`,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        status: "confirmed",
+        meetingType: "none",
+        meetingLink: null,
+        attendees: null,
+        isRecurring: false,
+        bookedForName: organizerName || null,
+        bookedForEmail: null,
+        msGraphEventId: null,
+      });
+
+      if (room?.msGraphRoomEmail && isGraphConfigured()) {
+        try {
+          const graphEvent = await createCalendarEvent({
+            roomEmail: room.msGraphRoomEmail,
+            subject: booking.title,
+            body: booking.description || "",
+            startTime,
+            endTime,
+            timezone: room.facility?.timezone || "America/Los_Angeles",
+            meetingType: "none",
+            attendees: [],
+          });
+          if (graphEvent?.eventId) {
+            await storage.updateBookingGraphEventId(booking.id, graphEvent.eventId);
+          }
+        } catch (e) {
+          console.error("Failed to create calendar event for tablet booking:", e);
+        }
+      }
+
+      io.emit("bookings:updated");
+      res.status(201).json(booking);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to create booking" });
+    }
+  });
+
+  // ── Admin Tablet Management Routes ──
+
+  app.get("/api/tablets", requireAdmin, async (req, res) => {
+    const tablets = await storage.getRoomTablets();
+    const safe = tablets.map(({ password, ...t }) => t);
+    res.json(safe);
+  });
+
+  app.post("/api/tablets", requireAdmin, async (req, res) => {
+    const parsed = z.object({
+      roomId: z.string(),
+      username: z.string().min(3),
+      password: z.string().min(4),
+      displayName: z.string().min(1),
+      isActive: z.boolean().optional().default(true),
+    }).safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+    }
+
+    const existing = await storage.getRoomTabletByUsername(parsed.data.username);
+    if (existing) {
+      return res.status(409).json({ message: "Username already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(parsed.data.password, 10);
+    const tablet = await storage.createRoomTablet({
+      ...parsed.data,
+      password: hashedPassword,
+    });
+
+    const { password, ...safe } = tablet;
+    res.status(201).json(safe);
+  });
+
+  app.patch("/api/tablets/:id", requireAdmin, async (req, res) => {
+    const parsed = z.object({
+      roomId: z.string().optional(),
+      username: z.string().min(3).optional(),
+      password: z.string().min(4).optional(),
+      displayName: z.string().min(1).optional(),
+      isActive: z.boolean().optional(),
+    }).safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+    }
+
+    const updateData: any = { ...parsed.data };
+    if (updateData.password) {
+      updateData.password = await bcrypt.hash(updateData.password, 10);
+    }
+
+    if (updateData.username) {
+      const existing = await storage.getRoomTabletByUsername(updateData.username);
+      if (existing && existing.id !== req.params.id) {
+        return res.status(409).json({ message: "Username already exists" });
+      }
+    }
+
+    const tablet = await storage.updateRoomTablet(req.params.id as string, updateData);
+    if (!tablet) return res.status(404).json({ message: "Tablet not found" });
+
+    const { password, ...safe } = tablet;
+    res.json(safe);
+  });
+
+  app.delete("/api/tablets/:id", requireAdmin, async (req, res) => {
+    const result = await storage.deleteRoomTablet(req.params.id as string);
+    if (!result) return res.status(404).json({ message: "Tablet not found" });
+    res.json({ message: "Tablet deleted" });
+  });
+
   return httpServer;
 }

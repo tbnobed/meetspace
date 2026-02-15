@@ -19,8 +19,11 @@ import AdminFacilities from "@/pages/admin/facilities";
 import AdminUsers from "@/pages/admin/users";
 import AdminAuditLog from "@/pages/admin/audit-log";
 import AdminWebhooks from "@/pages/admin/webhooks";
+import AdminTablets from "@/pages/admin/tablets";
 import AllMeetings from "@/pages/all-meetings";
 import AuthPage from "@/pages/auth";
+import TabletLogin from "@/pages/tablet-login";
+import KioskDisplay from "@/pages/kiosk";
 import NotFound from "@/pages/not-found";
 
 function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
@@ -78,6 +81,7 @@ function AuthenticatedLayout() {
                 <Route path="/admin/users">{() => <AdminRoute component={AdminUsers} />}</Route>
                 <Route path="/admin/audit">{() => <AdminRoute component={AdminAuditLog} />}</Route>
                 <Route path="/admin/webhooks">{() => <AdminRoute component={AdminWebhooks} />}</Route>
+                <Route path="/admin/tablets">{() => <AdminRoute component={AdminTablets} />}</Route>
                 <Route component={NotFound} />
               </Switch>
             </main>
@@ -99,6 +103,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/tablet" component={TabletLogin} />
+      <Route path="/kiosk" component={KioskDisplay} />
       <Route path="/book" component={GuestBookPage} />
       <Route>{() => <AuthenticatedLayout />}</Route>
     </Switch>

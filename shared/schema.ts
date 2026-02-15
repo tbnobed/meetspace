@@ -79,6 +79,15 @@ export const graphSubscriptions = pgTable("graph_subscriptions", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
 });
 
+export const roomTablets = pgTable("room_tablets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roomId: varchar("room_id").notNull().references(() => rooms.id, { onDelete: "cascade" }),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  displayName: text("display_name").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id),
@@ -101,6 +110,7 @@ export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true 
   msGraphEventId: z.string().nullable().optional(),
   meetingLink: z.string().nullable().optional(),
 });
+export const insertRoomTabletSchema = createInsertSchema(roomTablets).omit({ id: true });
 export const insertUserFacilityAssignmentSchema = createInsertSchema(userFacilityAssignments).omit({ id: true });
 export const insertGraphSubscriptionSchema = createInsertSchema(graphSubscriptions).omit({ id: true, createdAt: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, timestamp: true });
@@ -116,6 +126,8 @@ export type Booking = typeof bookings.$inferSelect;
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type UserFacilityAssignment = typeof userFacilityAssignments.$inferSelect;
 export type InsertUserFacilityAssignment = z.infer<typeof insertUserFacilityAssignmentSchema>;
+export type RoomTablet = typeof roomTablets.$inferSelect;
+export type InsertRoomTablet = z.infer<typeof insertRoomTabletSchema>;
 export type GraphSubscription = typeof graphSubscriptions.$inferSelect;
 export type InsertGraphSubscription = z.infer<typeof insertGraphSubscriptionSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;

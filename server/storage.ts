@@ -1,13 +1,14 @@
 import { eq, and, gte, lte, or, desc, ne, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
-  facilities, rooms, users, bookings, auditLogs, userFacilityAssignments, graphSubscriptions,
+  facilities, rooms, users, bookings, auditLogs, userFacilityAssignments, graphSubscriptions, roomTablets,
   type Facility, type InsertFacility,
   type Room, type InsertRoom,
   type User, type InsertUser,
   type Booking, type InsertBooking,
   type AuditLog, type InsertAuditLog,
   type UserFacilityAssignment, type InsertUserFacilityAssignment,
+  type RoomTablet, type InsertRoomTablet,
   type GraphSubscription, type InsertGraphSubscription,
   type RoomWithFacility, type BookingWithDetails,
 } from "@shared/schema";
@@ -70,6 +71,15 @@ export interface IStorage {
   updateGraphSubscription(id: string, data: Partial<InsertGraphSubscription>): Promise<GraphSubscription | undefined>;
   deleteGraphSubscription(id: string): Promise<boolean>;
   getExpiringSubscriptions(beforeDate: Date): Promise<GraphSubscription[]>;
+
+  // Room Tablets
+  getRoomTablets(): Promise<(RoomTablet & { room: Room; facility: Facility })[]>;
+  getRoomTablet(id: string): Promise<RoomTablet | undefined>;
+  getRoomTabletByUsername(username: string): Promise<RoomTablet | undefined>;
+  getRoomTabletsByRoomId(roomId: string): Promise<RoomTablet[]>;
+  createRoomTablet(data: InsertRoomTablet): Promise<RoomTablet>;
+  updateRoomTablet(id: string, data: Partial<InsertRoomTablet>): Promise<RoomTablet | undefined>;
+  deleteRoomTablet(id: string): Promise<boolean>;
 
   // Audit
   getAuditLogs(): Promise<(AuditLog & { user?: Pick<User, "id" | "displayName" | "email"> })[]>;
@@ -414,6 +424,50 @@ export class DatabaseStorage implements IStorage {
         eq(graphSubscriptions.status, "active")
       )
     );
+  }
+
+  // Room Tablets
+  async getRoomTablets(): Promise<(RoomTablet & { room: Room; facility: Facility })[]> {
+    const result = await db
+      .select()
+      .from(roomTablets)
+      .innerJoin(rooms, eq(roomTablets.roomId, rooms.id))
+      .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
+      .orderBy(roomTablets.displayName);
+    return result.map((r) => ({
+      ...r.room_tablets,
+      room: r.rooms,
+      facility: r.facilities,
+    }));
+  }
+
+  async getRoomTablet(id: string): Promise<RoomTablet | undefined> {
+    const [result] = await db.select().from(roomTablets).where(eq(roomTablets.id, id));
+    return result;
+  }
+
+  async getRoomTabletByUsername(username: string): Promise<RoomTablet | undefined> {
+    const [result] = await db.select().from(roomTablets).where(eq(roomTablets.username, username));
+    return result;
+  }
+
+  async getRoomTabletsByRoomId(roomId: string): Promise<RoomTablet[]> {
+    return db.select().from(roomTablets).where(eq(roomTablets.roomId, roomId));
+  }
+
+  async createRoomTablet(data: InsertRoomTablet): Promise<RoomTablet> {
+    const [result] = await db.insert(roomTablets).values(data).returning();
+    return result;
+  }
+
+  async updateRoomTablet(id: string, data: Partial<InsertRoomTablet>): Promise<RoomTablet | undefined> {
+    const [result] = await db.update(roomTablets).set(data).where(eq(roomTablets.id, id)).returning();
+    return result;
+  }
+
+  async deleteRoomTablet(id: string): Promise<boolean> {
+    const result = await db.delete(roomTablets).where(eq(roomTablets.id, id)).returning();
+    return result.length > 0;
   }
 
   // Audit
