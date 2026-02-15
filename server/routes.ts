@@ -1336,14 +1336,33 @@ export async function registerRoutes(
 
   app.post("/api/tablet/schedule", requireTabletAuth, async (req, res) => {
     const roomId = req.session.tabletRoomId as string;
-    const { title, startTime: startTimeStr, endTime: endTimeStr, organizerName } = req.body;
+    const { title, startTime: startTimeStr, endTime: endTimeStr, date: dateStr, startHour, endHour, organizerName } = req.body;
 
-    if (!startTimeStr || !endTimeStr) {
+    let startTime: Date;
+    let endTime: Date;
+
+    if (dateStr && startHour && endHour) {
+      const room = await storage.getRoom(roomId);
+      const tz = room?.facility?.timezone || "America/Los_Angeles";
+
+      const toUTC = (localDate: string, localTime: string, timezone: string): Date => {
+        const testDate = new Date(`${localDate}T${localTime}:00`);
+        const utcStr = testDate.toLocaleString("en-US", { timeZone: "UTC" });
+        const tzStr = testDate.toLocaleString("en-US", { timeZone: timezone });
+        const utcDate = new Date(utcStr);
+        const tzDate = new Date(tzStr);
+        const offset = tzDate.getTime() - utcDate.getTime();
+        return new Date(testDate.getTime() - offset);
+      };
+
+      startTime = toUTC(dateStr, startHour, tz);
+      endTime = toUTC(dateStr, endHour, tz);
+    } else if (startTimeStr && endTimeStr) {
+      startTime = new Date(startTimeStr);
+      endTime = new Date(endTimeStr);
+    } else {
       return res.status(400).json({ message: "Start time and end time are required" });
     }
-
-    const startTime = new Date(startTimeStr);
-    const endTime = new Date(endTimeStr);
 
     if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
       return res.status(400).json({ message: "Invalid date format" });

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,23 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Clock, Users, CalendarClock, CheckCircle2, XCircle, Wifi, LogOut } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Clock, Users, CalendarClock, CheckCircle2, XCircle, Wifi, LogOut, Plus, CalendarPlus } from "lucide-react";
+
+interface MeetingInfo {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  meetingType: string;
+  organizer: string;
+}
 
 interface RoomStatus {
   room: {
@@ -24,22 +40,9 @@ interface RoomStatus {
     timezone: string;
   };
   status: "available" | "occupied" | "upcoming";
-  currentMeeting: {
-    id: string;
-    title: string;
-    startTime: string;
-    endTime: string;
-    meetingType: string;
-    organizer: string;
-  } | null;
-  nextMeeting: {
-    id: string;
-    title: string;
-    startTime: string;
-    endTime: string;
-    meetingType: string;
-    organizer: string;
-  } | null;
+  currentMeeting: MeetingInfo | null;
+  nextMeeting: MeetingInfo | null;
+  todayMeetings: MeetingInfo[];
   availableUntil: string | null;
   upcomingCount: number;
   todayTotal: number;
@@ -89,11 +92,375 @@ function CurrentTime({ timezone }: { timezone: string }) {
   return <span data-testid="text-kiosk-time">{time}</span>;
 }
 
+function getHourInTz(tz: string, date: Date = new Date()): number {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      hour12: false,
+      timeZone: tz,
+    }).formatToParts(date);
+    const hourPart = parts.find(p => p.type === "hour");
+    return hourPart ? parseInt(hourPart.value, 10) : date.getHours();
+  } catch {
+    return date.getHours();
+  }
+}
+
+function DayTimeline({ meetings, timezone }: { meetings: MeetingInfo[]; timezone: string }) {
+  const startHour = 7;
+  const endHour = 20;
+  const totalHours = endHour - startHour;
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  const nowHour = getHourInTz(timezone);
+  const nowMinute = (() => {
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        minute: "numeric",
+        timeZone: timezone,
+      }).formatToParts(new Date());
+      const minPart = parts.find(p => p.type === "minute");
+      return minPart ? parseInt(minPart.value, 10) : new Date().getMinutes();
+    } catch {
+      return new Date().getMinutes();
+    }
+  })();
+
+  const nowPosition = ((nowHour - startHour) + nowMinute / 60) / totalHours * 100;
+  const showNowLine = nowPosition >= 0 && nowPosition <= 100;
+
+  const getMeetingPosition = (meeting: MeetingInfo) => {
+    const start = new Date(meeting.startTime);
+    const end = new Date(meeting.endTime);
+
+    let startH: number, startM: number, endH: number, endM: number;
+    try {
+      const sp = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "numeric", hour12: false, timeZone: timezone }).formatToParts(start);
+      const ep = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "numeric", hour12: false, timeZone: timezone }).formatToParts(end);
+      startH = parseInt(sp.find(p => p.type === "hour")?.value || "0", 10);
+      startM = parseInt(sp.find(p => p.type === "minute")?.value || "0", 10);
+      endH = parseInt(ep.find(p => p.type === "hour")?.value || "0", 10);
+      endM = parseInt(ep.find(p => p.type === "minute")?.value || "0", 10);
+    } catch {
+      startH = start.getHours();
+      startM = start.getMinutes();
+      endH = end.getHours();
+      endM = end.getMinutes();
+    }
+
+    const meetStartFrac = ((startH - startHour) + startM / 60) / totalHours;
+    const meetEndFrac = ((endH - startHour) + endM / 60) / totalHours;
+
+    const clampedStart = Math.max(0, Math.min(100, meetStartFrac * 100));
+    const clampedEnd = Math.max(0, Math.min(100, meetEndFrac * 100));
+    const width = Math.max(0.5, clampedEnd - clampedStart);
+
+    if (width <= 0) return null;
+    return { left: `${clampedStart}%`, width: `${width}%` };
+  };
+
+  const hours = Array.from({ length: totalHours + 1 }, (_, i) => startHour + i);
+
+  return (
+    <div className="w-full" data-testid="kiosk-day-timeline">
+      <div className="relative">
+        <div className="flex justify-between text-xs text-muted-foreground mb-1">
+          {hours.map(h => (
+            <span key={h} className="w-0 text-center" style={{ position: "relative" }}>
+              {h === 0 ? "12a" : h <= 12 ? (h === 12 ? "12p" : `${h}a`) : `${h - 12}p`}
+            </span>
+          ))}
+        </div>
+
+        <div className="relative h-12 bg-muted/50 rounded-md overflow-hidden">
+          {hours.map(h => (
+            <div
+              key={h}
+              className="absolute top-0 bottom-0 border-l border-border/30"
+              style={{ left: `${((h - startHour) / totalHours) * 100}%` }}
+            />
+          ))}
+
+          {meetings.map(meeting => {
+            const pos = getMeetingPosition(meeting);
+            if (!pos) return null;
+            const isCurrent = new Date(meeting.startTime) <= new Date() && new Date(meeting.endTime) > new Date();
+            return (
+              <div
+                key={meeting.id}
+                className={`absolute top-1 bottom-1 rounded-sm ${isCurrent ? "bg-destructive/80" : "bg-primary/60"}`}
+                style={{ left: pos.left, width: pos.width }}
+                title={`${meeting.title} - ${formatTimeRange(meeting.startTime, meeting.endTime, timezone)}`}
+                data-testid={`timeline-meeting-${meeting.id}`}
+              />
+            );
+          })}
+
+          {showNowLine && (
+            <div
+              className="absolute top-0 bottom-0 w-0.5 bg-foreground z-10"
+              style={{ left: `${nowPosition}%` }}
+            >
+              <div className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-foreground" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MeetingList({ meetings, timezone }: { meetings: MeetingInfo[]; timezone: string }) {
+  if (meetings.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-no-meetings">
+        No meetings scheduled today
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2 max-h-48 overflow-y-auto" data-testid="kiosk-meeting-list">
+      {meetings.map(meeting => {
+        const isPast = new Date(meeting.endTime) <= new Date();
+        const isCurrent = new Date(meeting.startTime) <= new Date() && new Date(meeting.endTime) > new Date();
+        return (
+          <div
+            key={meeting.id}
+            className={`flex items-center gap-3 p-2 rounded-md text-sm ${isCurrent ? "bg-destructive/10" : isPast ? "opacity-50" : "bg-muted/50"}`}
+            data-testid={`meeting-item-${meeting.id}`}
+          >
+            <div className={`w-1.5 h-8 rounded-full flex-shrink-0 ${isCurrent ? "bg-destructive" : isPast ? "bg-muted-foreground/30" : "bg-primary"}`} />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium truncate">{meeting.title}</p>
+              <p className="text-xs text-muted-foreground">
+                {formatTimeRange(meeting.startTime, meeting.endTime, timezone)}
+                {meeting.organizer !== "Unknown" && ` \u00B7 ${meeting.organizer}`}
+              </p>
+            </div>
+            {isCurrent && (
+              <Badge variant="destructive" className="flex-shrink-0 text-xs">Now</Badge>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function generateTimeOptions(tz: string): string[] {
+  const now = new Date();
+  let currentH: number, currentM: number;
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "numeric", hour12: false, timeZone: tz }).formatToParts(now);
+    currentH = parseInt(parts.find(p => p.type === "hour")?.value || "0", 10);
+    currentM = parseInt(parts.find(p => p.type === "minute")?.value || "0", 10);
+  } catch {
+    currentH = now.getHours();
+    currentM = now.getMinutes();
+  }
+
+  const roundedMin = Math.ceil(currentM / 15) * 15;
+  let startH = currentH;
+  let startM = roundedMin;
+  if (startM >= 60) {
+    startH += 1;
+    startM = 0;
+  }
+
+  const times: string[] = [];
+  for (let h = startH; h <= 23; h++) {
+    for (let m = (h === startH ? startM : 0); m < 60; m += 15) {
+      const hh = h.toString().padStart(2, "0");
+      const mm = m.toString().padStart(2, "0");
+      times.push(`${hh}:${mm}`);
+    }
+  }
+  return times;
+}
+
+function formatTimeLabel(t: string): string {
+  const [hStr, mStr] = t.split(":");
+  const h = parseInt(hStr, 10);
+  const m = mStr;
+  if (h === 0) return `12:${m} AM`;
+  if (h < 12) return `${h}:${m} AM`;
+  if (h === 12) return `12:${m} PM`;
+  return `${h - 12}:${m} PM`;
+}
+
+function ScheduleDialog({
+  open,
+  onOpenChange,
+  roomName,
+  timezone,
+  onScheduled,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  roomName: string;
+  timezone: string;
+  onScheduled: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [organizer, setOrganizer] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const timeOptions = useMemo(() => generateTimeOptions(timezone), [timezone, open]);
+
+  const endTimeOptions = useMemo(() => {
+    if (!startTime) return timeOptions;
+    return timeOptions.filter(t => t > startTime);
+  }, [startTime, timeOptions]);
+
+  useEffect(() => {
+    if (startTime && (!endTime || endTime <= startTime)) {
+      const [hStr, mStr] = startTime.split(":");
+      let h = parseInt(hStr, 10);
+      let m = parseInt(mStr, 10) + 30;
+      if (m >= 60) { h += 1; m -= 60; }
+      if (h <= 23) {
+        setEndTime(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
+      }
+    }
+  }, [startTime]);
+
+  const handleSchedule = async () => {
+    if (!startTime || !endTime) {
+      setError("Please select start and end times");
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+
+    try {
+      const now = new Date();
+      let dateStr: string;
+      try {
+        dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(now);
+      } catch {
+        dateStr = now.toISOString().slice(0, 10);
+      }
+
+      const res = await fetch("/api/tablet/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title || "Scheduled Meeting",
+          date: dateStr,
+          startHour: startTime,
+          endHour: endTime,
+          organizerName: organizer || undefined,
+        }),
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Scheduling failed");
+      }
+
+      onOpenChange(false);
+      setTitle("");
+      setOrganizer("");
+      setStartTime("");
+      setEndTime("");
+      onScheduled();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Schedule Meeting</DialogTitle>
+          <DialogDescription>Schedule a future meeting for {roomName}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {error && (
+            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md" data-testid="text-schedule-error">
+              {error}
+            </div>
+          )}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Meeting Title (optional)</label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Scheduled Meeting"
+              data-testid="input-schedule-title"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Your Name (optional)</label>
+            <Input
+              value={organizer}
+              onChange={(e) => setOrganizer(e.target.value)}
+              placeholder="Name"
+              data-testid="input-schedule-organizer"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Start Time</label>
+              <Select value={startTime} onValueChange={setStartTime}>
+                <SelectTrigger data-testid="select-schedule-start">
+                  <SelectValue placeholder="Start" />
+                </SelectTrigger>
+                <SelectContent>
+                  {timeOptions.map(t => (
+                    <SelectItem key={t} value={t}>{formatTimeLabel(t)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">End Time</label>
+              <Select value={endTime} onValueChange={setEndTime}>
+                <SelectTrigger data-testid="select-schedule-end">
+                  <SelectValue placeholder="End" />
+                </SelectTrigger>
+                <SelectContent>
+                  {endTimeOptions.map(t => (
+                    <SelectItem key={t} value={t}>{formatTimeLabel(t)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <Button
+            className="w-full"
+            onClick={handleSchedule}
+            disabled={submitting || !startTime || !endTime}
+            data-testid="button-schedule-confirm"
+          >
+            {submitting ? "Scheduling..." : "Schedule Meeting"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function KioskDisplay() {
   const [status, setStatus] = useState<RoomStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [bookDialogOpen, setBookDialogOpen] = useState(false);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [bookTitle, setBookTitle] = useState("");
   const [bookOrganizer, setBookOrganizer] = useState("");
   const [bookDuration, setBookDuration] = useState(30);
@@ -207,22 +574,21 @@ export default function KioskDisplay() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl sm:text-4xl font-bold" data-testid="text-kiosk-room-name">{status.room.name}</h1>
-          <div className="flex items-center justify-center gap-3 text-muted-foreground text-sm">
-            <span className="flex items-center gap-1">
-              <Users className="w-4 h-4" />
-              {status.room.capacity}
-            </span>
-            {status.room.floor && <span>Floor {status.room.floor}</span>}
+      <div className="flex-1 flex flex-col p-6 gap-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-kiosk-room-name">{status.room.name}</h1>
+            <div className="flex items-center gap-3 text-muted-foreground text-sm">
+              <span className="flex items-center gap-1">
+                <Users className="w-4 h-4" />
+                {status.room.capacity}
+              </span>
+              {status.room.floor && <span>Floor {status.room.floor}</span>}
+            </div>
           </div>
-        </div>
-
-        <div className="text-center">
           <Badge
             variant={isAvailable ? "default" : "destructive"}
-            className="text-lg px-6 py-2"
+            className="text-base px-4 py-1.5"
             data-testid="badge-kiosk-status"
           >
             {isAvailable ? "Available" : isOccupied ? "Occupied" : "Upcoming"}
@@ -230,26 +596,26 @@ export default function KioskDisplay() {
         </div>
 
         {isOccupied && status.currentMeeting && (
-          <Card className="w-full max-w-lg">
-            <CardContent className="p-6">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Current Meeting</p>
-              <h2 className="text-xl font-semibold mb-2" data-testid="text-kiosk-current-title">{status.currentMeeting.title}</h2>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Current Meeting</p>
+              <h2 className="text-lg font-semibold" data-testid="text-kiosk-current-title">{status.currentMeeting.title}</h2>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-1">
                 <span className="flex items-center gap-1">
                   <CalendarClock className="w-4 h-4" />
                   {formatTimeRange(status.currentMeeting.startTime, status.currentMeeting.endTime, tz)}
                 </span>
                 <span>{status.currentMeeting.organizer}</span>
+                <span data-testid="text-kiosk-time-remaining">
+                  {getMinutesRemaining(status.currentMeeting.endTime)} min remaining
+                </span>
               </div>
-              <p className="text-sm text-muted-foreground mt-3" data-testid="text-kiosk-time-remaining">
-                {getMinutesRemaining(status.currentMeeting.endTime)} min remaining
-              </p>
             </CardContent>
           </Card>
         )}
 
         {isAvailable && (
-          <div className="text-center space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
             {status.availableUntil ? (
               <p className="text-sm text-muted-foreground" data-testid="text-kiosk-available-until">
                 Available until {formatTime(status.availableUntil, tz)}
@@ -259,49 +625,65 @@ export default function KioskDisplay() {
                 Available for the rest of the day
               </p>
             )}
+            <div className="flex gap-2 ml-auto">
+              <Button
+                onClick={() => setBookDialogOpen(true)}
+                data-testid="button-kiosk-book"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Book Now
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setScheduleDialogOpen(true)}
+                data-testid="button-kiosk-schedule"
+              >
+                <CalendarPlus className="w-4 h-4 mr-1" />
+                Schedule
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {!isAvailable && (
+          <div className="flex items-center gap-3 flex-wrap">
+            {status.nextMeeting && !isOccupied && (
+              <p className="text-sm text-muted-foreground">
+                Next: {status.nextMeeting.title} at {formatTime(status.nextMeeting.startTime, tz)}
+              </p>
+            )}
+            {isOccupied && status.nextMeeting && (
+              <p className="text-sm text-muted-foreground">
+                Up next: {status.nextMeeting.title} at {formatTime(status.nextMeeting.startTime, tz)}
+              </p>
+            )}
             <Button
-              size="lg"
-              onClick={() => setBookDialogOpen(true)}
-              data-testid="button-kiosk-book"
+              variant="outline"
+              className="ml-auto"
+              onClick={() => setScheduleDialogOpen(true)}
+              data-testid="button-kiosk-schedule"
             >
-              <CheckCircle2 className="w-5 h-5 mr-2" />
-              Book Now
+              <CalendarPlus className="w-4 h-4 mr-1" />
+              Schedule
             </Button>
           </div>
         )}
 
-        {status.nextMeeting && !isOccupied && (
-          <Card className="w-full max-w-lg">
-            <CardContent className="p-6">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Next Meeting</p>
-              <h3 className="font-medium mb-1" data-testid="text-kiosk-next-title">{status.nextMeeting.title}</h3>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <CalendarClock className="w-4 h-4" />
-                  {formatTimeRange(status.nextMeeting.startTime, status.nextMeeting.endTime, tz)}
-                </span>
-                <span>{status.nextMeeting.organizer}</span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <div className="space-y-3 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Today's Schedule
+            </h3>
+            <span className="text-xs text-muted-foreground" data-testid="text-kiosk-today-count">
+              {status.todayTotal} meeting{status.todayTotal !== 1 ? "s" : ""}
+              {status.upcomingCount > 0 && ` \u00B7 ${status.upcomingCount} upcoming`}
+            </span>
+          </div>
 
-        {isOccupied && status.nextMeeting && (
-          <Card className="w-full max-w-lg">
-            <CardContent className="p-6">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Up Next</p>
-              <h3 className="font-medium mb-1">{status.nextMeeting.title}</h3>
-              <span className="text-sm text-muted-foreground">
-                {formatTimeRange(status.nextMeeting.startTime, status.nextMeeting.endTime, tz)}
-              </span>
-            </CardContent>
-          </Card>
-        )}
+          <DayTimeline meetings={status.todayMeetings} timezone={tz} />
 
-        <p className="text-xs text-muted-foreground" data-testid="text-kiosk-today-count">
-          {status.todayTotal} meeting{status.todayTotal !== 1 ? "s" : ""} today
-          {status.upcomingCount > 0 && ` \u00B7 ${status.upcomingCount} upcoming`}
-        </p>
+          <MeetingList meetings={status.todayMeetings} timezone={tz} />
+        </div>
       </div>
 
       <Dialog open={bookDialogOpen} onOpenChange={setBookDialogOpen}>
@@ -361,6 +743,14 @@ export default function KioskDisplay() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ScheduleDialog
+        open={scheduleDialogOpen}
+        onOpenChange={setScheduleDialogOpen}
+        roomName={status.room.name}
+        timezone={tz}
+        onScheduled={fetchStatus}
+      />
     </div>
   );
 }
