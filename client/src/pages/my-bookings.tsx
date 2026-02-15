@@ -231,12 +231,13 @@ function BookingCard({ booking }: { booking: BookingWithDetails }) {
 
 export default function MyBookings() {
   const { user } = useAuth();
-  const { data: bookings, isLoading } = useQuery<BookingWithDetails[]>({
-    queryKey: ["/api/bookings"],
-  });
-
   const isAdmin = user?.role === "admin";
   const isSiteAdmin = user?.role === "site_admin";
+
+  const queryPath = isAdmin || isSiteAdmin ? "/api/bookings" : "/api/bookings?mine=true";
+  const { data: bookings, isLoading } = useQuery<BookingWithDetails[]>({
+    queryKey: [queryPath],
+  });
 
   const pageTitle = isAdmin ? "All Bookings" : isSiteAdmin ? "Facility Bookings" : "My Bookings";
   const pageDescription = isAdmin

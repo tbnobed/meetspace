@@ -366,6 +366,13 @@ export async function registerRoutes(
     const user = await storage.getUser(req.session.userId as string);
     if (!user) return res.status(401).json({ message: "User not found" });
 
+    const mineOnly = req.query.mine === "true";
+
+    if (mineOnly && user.role !== "admin") {
+      const result = await storage.getBookingsByUserId(user.id);
+      return res.json(result);
+    }
+
     if (user.role === "admin") {
       const result = await storage.getBookings();
       return res.json(result);
