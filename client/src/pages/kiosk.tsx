@@ -557,8 +557,14 @@ export default function KioskDisplay() {
     <div className="min-h-screen flex flex-col bg-background">
       <div className={`flex items-center justify-between gap-2 px-6 py-3 ${isAvailable ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"}`}>
         <div className="flex items-center gap-3">
-          <Wifi className="w-4 h-4 opacity-60" />
+          <h1 className="text-lg font-bold" data-testid="text-kiosk-room-name">{status.room.name}</h1>
+          <span className="opacity-60">|</span>
           <span className="text-sm font-medium" data-testid="text-kiosk-facility">{status.room.facilityName}</span>
+          <div className="flex items-center gap-1 text-sm opacity-75">
+            <Users className="w-4 h-4" />
+            {status.room.capacity}
+            {status.room.floor && <span className="ml-1">Floor {status.room.floor}</span>}
+          </div>
         </div>
         <div className="flex items-center gap-3 text-sm">
           <Clock className="w-4 h-4 opacity-60" />
@@ -576,21 +582,16 @@ export default function KioskDisplay() {
 
       <div className="flex-1 flex overflow-hidden">
         <div className={`w-9 flex-shrink-0 ${isAvailable ? "bg-green-500" : "bg-red-500"}`} data-testid="bar-kiosk-status" />
-        <div className="flex-1 flex flex-col p-6 gap-4 justify-center">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="space-y-1">
-              <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-kiosk-room-name">{status.room.name}</h1>
-              <div className="flex items-center gap-3 text-muted-foreground text-sm">
-                <span className="flex items-center gap-1">
-                  <Users className="w-4 h-4" />
-                  {status.room.capacity}
-                </span>
-                {status.room.floor && <span>Floor {status.room.floor}</span>}
-              </div>
-            </div>
+        <div className="flex-1 flex flex-col p-8 gap-6 justify-center relative">
+          <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)`,
+            backgroundSize: "24px 24px",
+          }} />
+
+          <div className="relative flex items-center gap-4 flex-wrap">
             <Badge
               variant={isAvailable ? "default" : "destructive"}
-              className="text-base px-4 py-1.5"
+              className="text-lg px-5 py-2"
               data-testid="badge-kiosk-status"
             >
               {isAvailable ? "Available" : isOccupied ? "Occupied" : "Upcoming"}
@@ -598,11 +599,11 @@ export default function KioskDisplay() {
           </div>
 
           {isOccupied && status.currentMeeting && (
-            <Card>
-              <CardContent className="p-4">
+            <Card className="relative">
+              <CardContent className="p-5">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Current Meeting</p>
-                <h2 className="text-lg font-semibold" data-testid="text-kiosk-current-title">{status.currentMeeting.title}</h2>
-                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-1">
+                <h2 className="text-xl font-semibold" data-testid="text-kiosk-current-title">{status.currentMeeting.title}</h2>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-2">
                   <span className="flex items-center gap-1">
                     <CalendarClock className="w-4 h-4" />
                     {formatTimeRange(status.currentMeeting.startTime, status.currentMeeting.endTime, tz)}
@@ -617,30 +618,32 @@ export default function KioskDisplay() {
           )}
 
           {isAvailable && (
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex items-center gap-4 flex-wrap">
               {status.availableUntil ? (
-                <p className="text-sm text-muted-foreground" data-testid="text-kiosk-available-until">
+                <p className="text-muted-foreground" data-testid="text-kiosk-available-until">
                   Available until {formatTime(status.availableUntil, tz)}
                 </p>
               ) : (
-                <p className="text-sm text-muted-foreground" data-testid="text-kiosk-available-rest">
+                <p className="text-muted-foreground" data-testid="text-kiosk-available-rest">
                   Available for the rest of the day
                 </p>
               )}
-              <div className="flex gap-2 ml-auto">
+              <div className="flex gap-3 ml-auto">
                 <Button
+                  size="lg"
                   onClick={() => setBookDialogOpen(true)}
                   data-testid="button-kiosk-book"
                 >
-                  <Plus className="w-4 h-4 mr-1" />
+                  <Plus className="w-5 h-5 mr-2" />
                   Book Now
                 </Button>
                 <Button
+                  size="lg"
                   variant="outline"
                   onClick={() => setScheduleDialogOpen(true)}
                   data-testid="button-kiosk-schedule"
                 >
-                  <CalendarPlus className="w-4 h-4 mr-1" />
+                  <CalendarPlus className="w-5 h-5 mr-2" />
                   Schedule
                 </Button>
               </div>
@@ -648,24 +651,25 @@ export default function KioskDisplay() {
           )}
 
           {!isAvailable && (
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex items-center gap-4 flex-wrap">
               {status.nextMeeting && !isOccupied && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground">
                   Next: {status.nextMeeting.title} at {formatTime(status.nextMeeting.startTime, tz)}
                 </p>
               )}
               {isOccupied && status.nextMeeting && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground">
                   Up next: {status.nextMeeting.title} at {formatTime(status.nextMeeting.startTime, tz)}
                 </p>
               )}
               <Button
+                size="lg"
                 variant="outline"
                 className="ml-auto"
                 onClick={() => setScheduleDialogOpen(true)}
                 data-testid="button-kiosk-schedule"
               >
-                <CalendarPlus className="w-4 h-4 mr-1" />
+                <CalendarPlus className="w-5 h-5 mr-2" />
                 Schedule
               </Button>
             </div>
