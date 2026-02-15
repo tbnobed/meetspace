@@ -589,22 +589,18 @@ export default function KioskDisplay() {
           }} />
 
           <div className="relative flex-1 flex flex-col justify-center gap-6">
-            <div className="flex items-center gap-4 flex-wrap">
-              <Badge
-                variant={isAvailable ? "default" : "destructive"}
-                className="text-lg px-5 py-2"
-                data-testid="badge-kiosk-status"
-              >
+            <div className="space-y-1">
+              <h2 className={`text-3xl font-bold ${isAvailable ? "text-green-400" : "text-red-400"}`} data-testid="badge-kiosk-status">
                 {isAvailable ? "Available" : isOccupied ? "Occupied" : "Upcoming"}
-              </Badge>
+              </h2>
               {isAvailable && status.availableUntil && (
                 <p className="text-muted-foreground" data-testid="text-kiosk-available-until">
-                  until {formatTime(status.availableUntil, tz)}
+                  Until {formatTime(status.availableUntil, tz)}
                 </p>
               )}
               {isAvailable && !status.availableUntil && (
                 <p className="text-muted-foreground" data-testid="text-kiosk-available-rest">
-                  for the rest of the day
+                  For the rest of the day
                 </p>
               )}
             </div>
