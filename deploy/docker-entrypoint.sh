@@ -17,5 +17,33 @@ pool.query(\"ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'site_admin'\")
   .catch(e => { console.log('site_admin check:', e.message); pool.end(); });
 " 2>&1 || true
 
+echo "Ensuring bookings.user_id is nullable with ON DELETE SET NULL..."
+node -e "
+const pg = require('pg');
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+(async () => {
+  try {
+    await pool.query('ALTER TABLE bookings ALTER COLUMN user_id DROP NOT NULL');
+    await pool.query('ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_user_id_users_id_fk');
+    await pool.query('ALTER TABLE bookings ADD CONSTRAINT bookings_user_id_users_id_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL');
+    console.log('bookings.user_id constraint updated.');
+  } catch(e) { console.log('bookings.user_id check:', e.message); }
+  pool.end();
+})();
+" 2>&1 || true
+
+echo "Clearing orphaned user assignments on imported bookings..."
+node -e "
+const pg = require('pg');
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+(async () => {
+  try {
+    const res = await pool.query(\"UPDATE bookings SET user_id = NULL WHERE ms_graph_event_id IS NOT NULL AND user_id IS NOT NULL\");
+    console.log('Cleared user_id on ' + res.rowCount + ' imported booking(s).');
+  } catch(e) { console.log('imported bookings cleanup:', e.message); }
+  pool.end();
+})();
+" 2>&1 || true
+
 echo "Starting MeetSpace Manager..."
 exec node dist/index.cjs
