@@ -583,7 +583,7 @@ export default function KioskDisplay() {
       <div className="flex-1 flex overflow-hidden">
         <div className={`w-9 flex-shrink-0 ${isAvailable ? "bg-green-500" : "bg-red-500"}`} data-testid="bar-kiosk-status" />
         <div className="flex-1 flex flex-col p-8 gap-6 justify-center relative">
-          <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{
+          <div className="absolute inset-0 opacity-[0.08] pointer-events-none" style={{
             backgroundImage: `radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)`,
             backgroundSize: "24px 24px",
           }} />
