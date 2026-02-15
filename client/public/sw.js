@@ -1,4 +1,4 @@
-const CACHE_NAME = "meetspace-kiosk-v1";
+const CACHE_NAME = "meetspace-kiosk-v2";
 const PRECACHE_URLS = [
   "/tablet",
   "/kiosk",

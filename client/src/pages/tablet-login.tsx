@@ -108,7 +108,7 @@ export default function TabletLogin() {
         const data = await res.json();
         throw new Error(data.message || "Login failed");
       }
-      window.location.href = "/kiosk";
+      window.location.replace("/kiosk");
     } catch (err: any) {
       setError(err.message);
     } finally {
