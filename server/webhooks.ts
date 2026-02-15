@@ -180,12 +180,6 @@ export function stopRenewalScheduler(): void {
   }
 }
 
-async function getSystemUserId(): Promise<string> {
-  const admins = await storage.getUsers();
-  const admin = admins.find(u => u.role === "admin");
-  if (admin) return admin.id;
-  throw new Error("No admin user found for webhook booking creation");
-}
 
 export async function processNotification(notification: any): Promise<void> {
   const { changeType, resource, resourceData, clientState, subscriptionId } = notification;
@@ -235,9 +229,8 @@ async function handleEventDeleted(eventId: string, roomId: string): Promise<void
   const existingBooking = await storage.getBookingByGraphEventId(eventId);
   if (existingBooking && existingBooking.status === "confirmed") {
     await storage.cancelBooking(existingBooking.id);
-    const systemUserId = await getSystemUserId();
     await storage.createAuditLog({
-      userId: systemUserId,
+      userId: null,
       action: "booking_cancelled",
       entityType: "booking",
       entityId: existingBooking.id,
@@ -314,11 +307,9 @@ async function handleEventCreatedOrUpdated(
       return;
     }
 
-    const systemUserId = await getSystemUserId();
-
     const booking = await storage.createBooking({
       roomId,
-      userId: systemUserId,
+      userId: null,
       title: event.subject || "Outlook Meeting",
       description: `Auto-synced from Outlook calendar. Organizer: ${organizerName || organizerEmail || "Unknown"}`,
       startTime: startTime,
@@ -333,7 +324,7 @@ async function handleEventCreatedOrUpdated(
     });
 
     await storage.createAuditLog({
-      userId: systemUserId,
+      userId: null,
       action: "booking_created",
       entityType: "booking",
       entityId: booking.id,

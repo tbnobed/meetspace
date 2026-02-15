@@ -427,15 +427,17 @@ export async function registerRoutes(
 
     if (bookingDetails) {
       const formatTime = (d: Date) => d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
-      sendBookingCancellation({
-        to: bookingDetails.user.email,
-        displayName: bookingDetails.user.displayName,
-        title: booking.title,
-        roomName: bookingDetails.room.name,
-        facilityName: bookingDetails.facility.name,
-        startTime: formatTime(new Date(booking.startTime)),
-        endTime: formatTime(new Date(booking.endTime)),
-      }).catch(() => {});
+      if (bookingDetails.user) {
+        sendBookingCancellation({
+          to: bookingDetails.user.email,
+          displayName: bookingDetails.user.displayName,
+          title: booking.title,
+          roomName: bookingDetails.room.name,
+          facilityName: bookingDetails.facility.name,
+          startTime: formatTime(new Date(booking.startTime)),
+          endTime: formatTime(new Date(booking.endTime)),
+        }).catch(() => {});
+      }
 
       if (isGraphConfigured() && booking.msGraphEventId && bookingDetails.room.msGraphRoomEmail) {
         try {
@@ -730,29 +732,21 @@ export async function registerRoutes(
       if (!existing) {
         return res.status(404).json({ message: "User not found" });
       }
-      const allBookings = await storage.getBookings();
-      const userBookings = allBookings.filter((b) => b.userId === id && b.status !== "cancelled");
-      for (const booking of userBookings) {
-        await storage.cancelBooking(booking.id);
-      }
       await storage.nullifyAuditLogUser(id);
       const deleted = await storage.deleteUser(id);
       if (!deleted) {
         return res.status(500).json({ message: "Failed to delete user" });
       }
-      const cancelledCount = userBookings.length;
       await storage.createAuditLog({
         action: "user_deleted",
         entityType: "user",
         entityId: id,
         userId: req.session.userId as string,
-        details: JSON.stringify({ username: existing.username, displayName: existing.displayName, cancelledBookings: cancelledCount }),
+        details: JSON.stringify({ username: existing.username, displayName: existing.displayName }),
       });
       io.emit("users:updated");
-      if (cancelledCount > 0) {
-        io.emit("bookings:updated");
-      }
-      res.json({ message: cancelledCount > 0 ? `User deleted and ${cancelledCount} booking(s) were automatically cancelled.` : "User deleted" });
+      io.emit("bookings:updated");
+      res.json({ message: "User deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to delete user" });
     }
@@ -924,7 +918,6 @@ export async function registerRoutes(
       const existingEventIds = new Set(existingBookings.filter((b) => b.msGraphEventId).map((b) => b.msGraphEventId));
 
       const results = { imported: 0, skipped: 0, errors: 0 };
-      const adminUserId = req.session.userId as string;
       const importedIntervals: Map<string, { start: Date; end: Date }[]> = new Map();
 
       for (const room of rooms) {
@@ -978,7 +971,7 @@ export async function registerRoutes(
 
             await storage.createBooking({
               roomId: room.id,
-              userId: adminUserId,
+              userId: null,
               title: event.subject || "Imported Meeting",
               description: `Imported from Outlook calendar. Organizer: ${event.organizer?.emailAddress?.name || event.organizer?.emailAddress?.address || "Unknown"}`,
               startTime: startTime,
@@ -1007,7 +1000,7 @@ export async function registerRoutes(
       }
 
       await storage.createAuditLog({
-        userId: adminUserId,
+        userId: req.session.userId as string,
         action: "booking_created",
         entityType: "booking",
         entityId: facilityId || "all",

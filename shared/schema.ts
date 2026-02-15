@@ -51,7 +51,7 @@ export const userFacilityAssignments = pgTable("user_facility_assignments", {
 export const bookings = pgTable("bookings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   roomId: varchar("room_id").notNull().references(() => rooms.id),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   description: text("description"),
   startTime: timestamp("start_time", { withTimezone: true }).notNull(),
@@ -123,4 +123,4 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
 // Extended types for frontend
 export type RoomWithFacility = Room & { facility: Facility };
-export type BookingWithDetails = Booking & { room: Room; facility: Facility; user: Pick<User, "id" | "displayName" | "email"> };
+export type BookingWithDetails = Booking & { room: Room; facility: Facility; user: Pick<User, "id" | "displayName" | "email"> | null };

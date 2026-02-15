@@ -213,20 +213,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Bookings
+  private mapBookingRow(r: any): BookingWithDetails {
+    return {
+      ...r.bookings,
+      room: r.rooms,
+      facility: r.facilities,
+      user: r.users ? { id: r.users.id, displayName: r.users.displayName, email: r.users.email } : null,
+    };
+  }
+
   async getBookings(): Promise<BookingWithDetails[]> {
     const result = await db
       .select()
       .from(bookings)
       .innerJoin(rooms, eq(bookings.roomId, rooms.id))
       .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
-      .innerJoin(users, eq(bookings.userId, users.id))
+      .leftJoin(users, eq(bookings.userId, users.id))
       .orderBy(desc(bookings.startTime));
-    return result.map((r) => ({
-      ...r.bookings,
-      room: r.rooms,
-      facility: r.facilities,
-      user: { id: r.users.id, displayName: r.users.displayName, email: r.users.email },
-    }));
+    return result.map((r) => this.mapBookingRow(r));
   }
 
   async getBookingsByUserId(userId: string): Promise<BookingWithDetails[]> {
@@ -235,15 +239,10 @@ export class DatabaseStorage implements IStorage {
       .from(bookings)
       .innerJoin(rooms, eq(bookings.roomId, rooms.id))
       .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
-      .innerJoin(users, eq(bookings.userId, users.id))
+      .leftJoin(users, eq(bookings.userId, users.id))
       .where(eq(bookings.userId, userId))
       .orderBy(desc(bookings.startTime));
-    return result.map((r) => ({
-      ...r.bookings,
-      room: r.rooms,
-      facility: r.facilities,
-      user: { id: r.users.id, displayName: r.users.displayName, email: r.users.email },
-    }));
+    return result.map((r) => this.mapBookingRow(r));
   }
 
   async getBookingsByFacilityIds(facilityIds: string[]): Promise<BookingWithDetails[]> {
@@ -253,15 +252,10 @@ export class DatabaseStorage implements IStorage {
       .from(bookings)
       .innerJoin(rooms, eq(bookings.roomId, rooms.id))
       .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
-      .innerJoin(users, eq(bookings.userId, users.id))
+      .leftJoin(users, eq(bookings.userId, users.id))
       .where(inArray(rooms.facilityId, facilityIds))
       .orderBy(desc(bookings.startTime));
-    return result.map((r) => ({
-      ...r.bookings,
-      room: r.rooms,
-      facility: r.facilities,
-      user: { id: r.users.id, displayName: r.users.displayName, email: r.users.email },
-    }));
+    return result.map((r) => this.mapBookingRow(r));
   }
 
   async getBookingsByRange(start: Date, end: Date): Promise<BookingWithDetails[]> {
@@ -270,7 +264,7 @@ export class DatabaseStorage implements IStorage {
       .from(bookings)
       .innerJoin(rooms, eq(bookings.roomId, rooms.id))
       .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
-      .innerJoin(users, eq(bookings.userId, users.id))
+      .leftJoin(users, eq(bookings.userId, users.id))
       .where(
         and(
           gte(bookings.endTime, start),
@@ -279,12 +273,7 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(bookings.startTime);
-    return result.map((r) => ({
-      ...r.bookings,
-      room: r.rooms,
-      facility: r.facilities,
-      user: { id: r.users.id, displayName: r.users.displayName, email: r.users.email },
-    }));
+    return result.map((r) => this.mapBookingRow(r));
   }
 
   async getTodayBookings(): Promise<BookingWithDetails[]> {
@@ -298,7 +287,7 @@ export class DatabaseStorage implements IStorage {
       .from(bookings)
       .innerJoin(rooms, eq(bookings.roomId, rooms.id))
       .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
-      .innerJoin(users, eq(bookings.userId, users.id))
+      .leftJoin(users, eq(bookings.userId, users.id))
       .where(
         and(
           gte(bookings.endTime, todayStart),
@@ -308,12 +297,7 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(bookings.startTime);
 
-    return result.map((r) => ({
-      ...r.bookings,
-      room: r.rooms,
-      facility: r.facilities,
-      user: { id: r.users.id, displayName: r.users.displayName, email: r.users.email },
-    }));
+    return result.map((r) => this.mapBookingRow(r));
   }
 
   async getBooking(id: string): Promise<BookingWithDetails | undefined> {
@@ -322,15 +306,10 @@ export class DatabaseStorage implements IStorage {
       .from(bookings)
       .innerJoin(rooms, eq(bookings.roomId, rooms.id))
       .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
-      .innerJoin(users, eq(bookings.userId, users.id))
+      .leftJoin(users, eq(bookings.userId, users.id))
       .where(eq(bookings.id, id));
     if (!result) return undefined;
-    return {
-      ...result.bookings,
-      room: result.rooms,
-      facility: result.facilities,
-      user: { id: result.users.id, displayName: result.users.displayName, email: result.users.email },
-    };
+    return this.mapBookingRow(result);
   }
 
   async createBooking(data: InsertBooking): Promise<Booking> {
