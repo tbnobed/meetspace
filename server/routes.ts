@@ -1241,6 +1241,15 @@ export async function registerRoutes(
       }
     }
 
+    const meetingMapper = (b: typeof roomBookings[0]) => ({
+      id: b.id,
+      title: b.title,
+      startTime: b.startTime,
+      endTime: b.endTime,
+      meetingType: b.meetingType,
+      organizer: b.bookedForName || b.user?.displayName || "Unknown",
+    });
+
     res.json({
       room: {
         id: room.id,
@@ -1252,22 +1261,9 @@ export async function registerRoutes(
         timezone: room.facility?.timezone || "America/Los_Angeles",
       },
       status,
-      currentMeeting: currentMeeting ? {
-        id: currentMeeting.id,
-        title: currentMeeting.title,
-        startTime: currentMeeting.startTime,
-        endTime: currentMeeting.endTime,
-        meetingType: currentMeeting.meetingType,
-        organizer: currentMeeting.bookedForName || currentMeeting.user?.displayName || "Unknown",
-      } : null,
-      nextMeeting: nextMeeting ? {
-        id: nextMeeting.id,
-        title: nextMeeting.title,
-        startTime: nextMeeting.startTime,
-        endTime: nextMeeting.endTime,
-        meetingType: nextMeeting.meetingType,
-        organizer: nextMeeting.bookedForName || nextMeeting.user?.displayName || "Unknown",
-      } : null,
+      currentMeeting: currentMeeting ? meetingMapper(currentMeeting) : null,
+      nextMeeting: nextMeeting ? meetingMapper(nextMeeting) : null,
+      todayMeetings: roomBookings.map(meetingMapper),
       availableUntil,
       upcomingCount: upcomingMeetings.length,
       todayTotal: roomBookings.length,
@@ -1335,6 +1331,81 @@ export async function registerRoutes(
       res.status(201).json(booking);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to create booking" });
+    }
+  });
+
+  app.post("/api/tablet/schedule", requireTabletAuth, async (req, res) => {
+    const roomId = req.session.tabletRoomId as string;
+    const { title, startTime: startTimeStr, endTime: endTimeStr, organizerName } = req.body;
+
+    if (!startTimeStr || !endTimeStr) {
+      return res.status(400).json({ message: "Start time and end time are required" });
+    }
+
+    const startTime = new Date(startTimeStr);
+    const endTime = new Date(endTimeStr);
+
+    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+      return res.status(400).json({ message: "Invalid date format" });
+    }
+
+    if (endTime <= startTime) {
+      return res.status(400).json({ message: "End time must be after start time" });
+    }
+
+    if (startTime < new Date()) {
+      return res.status(400).json({ message: "Cannot schedule meetings in the past" });
+    }
+
+    const hasConflict = await storage.checkConflict(roomId, startTime, endTime);
+    if (hasConflict) {
+      return res.status(409).json({ message: "Room is not available for the requested time" });
+    }
+
+    const room = await storage.getRoom(roomId);
+
+    try {
+      const booking = await storage.createBooking({
+        roomId,
+        userId: null,
+        title: title || "Scheduled Meeting",
+        description: `Scheduled from room tablet${organizerName ? ` by ${organizerName}` : ""}`,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        status: "confirmed",
+        meetingType: "none",
+        meetingLink: null,
+        attendees: null,
+        isRecurring: false,
+        bookedForName: organizerName || null,
+        bookedForEmail: null,
+        msGraphEventId: null,
+      });
+
+      if (room?.msGraphRoomEmail && isGraphConfigured()) {
+        try {
+          const graphEvent = await createCalendarEvent({
+            roomEmail: room.msGraphRoomEmail,
+            subject: booking.title,
+            body: booking.description || "",
+            startTime,
+            endTime,
+            timezone: room.facility?.timezone || "America/Los_Angeles",
+            meetingType: "none",
+            attendees: [],
+          });
+          if (graphEvent?.eventId) {
+            await storage.updateBookingGraphEventId(booking.id, graphEvent.eventId);
+          }
+        } catch (e) {
+          console.error("Failed to create calendar event for scheduled tablet booking:", e);
+        }
+      }
+
+      io.emit("bookings:updated");
+      res.status(201).json(booking);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to schedule booking" });
     }
   });
 
