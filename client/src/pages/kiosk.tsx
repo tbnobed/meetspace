@@ -555,7 +555,7 @@ export default function KioskDisplay() {
 
   return (
     <div className="dark h-screen flex flex-col bg-background text-foreground overflow-hidden">
-      <div className={`flex items-center justify-between gap-4 px-8 py-6 ${isAvailable ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"}`}>
+      <div className="flex items-center justify-between gap-4 px-8 py-6 text-white" style={{ background: "linear-gradient(135deg, #334155, #475569, #3b4f6b)" }}>
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold" data-testid="text-kiosk-room-name">{status.room.name}</h1>
           <span className="opacity-60 text-xl">|</span>
@@ -639,6 +639,8 @@ export default function KioskDisplay() {
             {isAvailable && (
               <Button
                 size="lg"
+                className="text-white border-transparent"
+                style={{ background: "linear-gradient(135deg, #334155, #475569, #3b4f6b)" }}
                 onClick={() => setBookDialogOpen(true)}
                 data-testid="button-kiosk-book"
               >
@@ -649,6 +651,8 @@ export default function KioskDisplay() {
             <Button
               size="lg"
               variant="outline"
+              className="text-white border-slate-500"
+              style={{ background: "linear-gradient(135deg, #1e293b, #334155, #2a3a4f)" }}
               onClick={() => setScheduleDialogOpen(true)}
               data-testid="button-kiosk-schedule"
             >
