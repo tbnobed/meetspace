@@ -363,7 +363,7 @@ export default function BookRoom() {
                             <Calendar
                               mode="single"
                               selected={field.value}
-                              onSelect={field.onChange}
+                              onSelect={(day) => { if (day) field.onChange(day); }}
                               disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                             />
                           </PopoverContent>
