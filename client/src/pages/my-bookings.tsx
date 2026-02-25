@@ -59,6 +59,7 @@ import {
   HelpCircle,
   Loader2,
   Pencil,
+  ArrowUpDown,
 } from "lucide-react";
 import type { BookingWithDetails } from "@shared/schema";
 import { useAuth } from "@/lib/auth";
@@ -486,10 +487,21 @@ function BookingCard({ booking }: { booking: BookingWithDetails }) {
   );
 }
 
+type SortOrder = "closest" | "furthest";
+
+function sortBookings(bookings: BookingWithDetails[], order: SortOrder): BookingWithDetails[] {
+  return [...bookings].sort((a, b) => {
+    const timeA = new Date(a.startTime).getTime();
+    const timeB = new Date(b.startTime).getTime();
+    return order === "closest" ? timeA - timeB : timeB - timeA;
+  });
+}
+
 export default function MyBookings() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const isSiteAdmin = user?.role === "site_admin";
+  const [sortOrder, setSortOrder] = useState<SortOrder>("closest");
 
   const queryPath = isAdmin || isSiteAdmin ? "/api/bookings" : "/api/bookings?mine=true";
   const { data: bookings, isLoading } = useQuery<BookingWithDetails[]>({
@@ -504,13 +516,18 @@ export default function MyBookings() {
       : "View and manage your conference room reservations";
 
   const now = new Date();
-  const upcoming = bookings?.filter(
-    (b) => b.status === "confirmed" && new Date(b.endTime) >= now
-  ) || [];
-  const past = bookings?.filter(
-    (b) => b.status === "confirmed" && new Date(b.endTime) < now
-  ) || [];
-  const cancelled = bookings?.filter((b) => b.status === "cancelled") || [];
+  const upcoming = sortBookings(
+    bookings?.filter((b) => b.status === "confirmed" && new Date(b.endTime) >= now) || [],
+    sortOrder
+  );
+  const past = sortBookings(
+    bookings?.filter((b) => b.status === "confirmed" && new Date(b.endTime) < now) || [],
+    sortOrder
+  );
+  const cancelled = sortBookings(
+    bookings?.filter((b) => b.status === "cancelled") || [],
+    sortOrder
+  );
 
   if (isLoading) {
     return (
@@ -541,17 +558,28 @@ export default function MyBookings() {
       />
 
       <Tabs defaultValue="upcoming">
-        <TabsList data-testid="tabs-bookings">
-          <TabsTrigger value="upcoming" data-testid="tab-upcoming">
-            Upcoming ({upcoming.length})
-          </TabsTrigger>
-          <TabsTrigger value="past" data-testid="tab-past">
-            Past ({past.length})
-          </TabsTrigger>
-          <TabsTrigger value="cancelled" data-testid="tab-cancelled">
-            Cancelled ({cancelled.length})
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <TabsList data-testid="tabs-bookings">
+            <TabsTrigger value="upcoming" data-testid="tab-upcoming">
+              Upcoming ({upcoming.length})
+            </TabsTrigger>
+            <TabsTrigger value="past" data-testid="tab-past">
+              Past ({past.length})
+            </TabsTrigger>
+            <TabsTrigger value="cancelled" data-testid="tab-cancelled">
+              Cancelled ({cancelled.length})
+            </TabsTrigger>
+          </TabsList>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSortOrder(sortOrder === "closest" ? "furthest" : "closest")}
+            data-testid="button-sort-order"
+          >
+            <ArrowUpDown className="w-3.5 h-3.5 mr-1.5" />
+            {sortOrder === "closest" ? "Soonest First" : "Latest First"}
+          </Button>
+        </div>
 
         <TabsContent value="upcoming" className="mt-4">
           {upcoming.length > 0 ? (
