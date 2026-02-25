@@ -349,6 +349,7 @@ export async function registerRoutes(
           timezone: "UTC",
           body: booking.description || undefined,
           meetingType: booking.meetingType || undefined,
+          meetingLink: booking.meetingLink || undefined,
           organizerEmail: room.msGraphRoomEmail,
           attendees: eventAttendees.length > 0 ? eventAttendees : undefined,
         });
@@ -532,6 +533,8 @@ export async function registerRoutes(
             startTime: updateData.startTime,
             endTime: updateData.endTime,
             body: updateData.description,
+            meetingType: updateData.meetingType || existing.meetingType || undefined,
+            meetingLink: updateData.meetingLink || existing.meetingLink || undefined,
             attendees: updateData.attendees,
           });
         } catch (graphErr: any) {

@@ -107,6 +107,7 @@ export interface CreateEventParams {
   timezone: string;
   body?: string;
   meetingType?: string;
+  meetingLink?: string;
   organizerEmail?: string;
   attendees?: string[];
 }
@@ -120,6 +121,7 @@ export async function createCalendarEvent(params: CreateEventParams): Promise<{ 
     timezone,
     body,
     meetingType,
+    meetingLink,
     organizerEmail,
     attendees,
   } = params;
@@ -147,11 +149,20 @@ export async function createCalendarEvent(params: CreateEventParams): Promise<{ 
     }
   }
 
-  let eventBody = body || "";
-  if (meetingType?.toLowerCase() === "zoom" && !eventBody.includes("zoom")) {
-    eventBody += "\n\nMeeting Type: Zoom - Please use the Zoom link provided separately.";
-  } else if (meetingType?.toLowerCase() === "google meet" && !eventBody.includes("meet.google")) {
-    eventBody += "\n\nMeeting Type: Google Meet - Please use the Google Meet link provided separately.";
+  let eventBodyHtml = "";
+  const descriptionText = body || `Meeting: ${subject}`;
+  eventBodyHtml += `<p>${descriptionText.replace(/\n/g, "<br>")}</p>`;
+
+  if (meetingType?.toLowerCase() === "zoom" && meetingLink) {
+    eventBodyHtml += `<p><strong>Zoom Meeting</strong></p>`;
+    eventBodyHtml += `<p><a href="${meetingLink}">Join Zoom Meeting</a></p>`;
+    eventBodyHtml += `<p>${meetingLink}</p>`;
+  } else if (meetingType?.toLowerCase() === "zoom") {
+    eventBodyHtml += `<p><strong>Meeting Type:</strong> Zoom</p>`;
+  } else if (meetingType?.toLowerCase() === "google meet" && meetingLink) {
+    eventBodyHtml += `<p><strong>Google Meet</strong></p>`;
+    eventBodyHtml += `<p><a href="${meetingLink}">Join Google Meet</a></p>`;
+    eventBodyHtml += `<p>${meetingLink}</p>`;
   }
 
   const eventData: any = {
@@ -171,8 +182,8 @@ export async function createCalendarEvent(params: CreateEventParams): Promise<{ 
     },
     attendees: eventAttendees,
     body: {
-      contentType: "text",
-      content: eventBody || `Meeting: ${subject}`,
+      contentType: "html",
+      content: eventBodyHtml,
     },
   };
 
@@ -200,15 +211,35 @@ export async function updateCalendarEvent(params: {
   startTime?: Date;
   endTime?: Date;
   body?: string;
+  meetingType?: string;
+  meetingLink?: string;
   attendees?: string[];
 }): Promise<void> {
-  const { roomEmail, eventId, subject, startTime, endTime, body, attendees } = params;
+  const { roomEmail, eventId, subject, startTime, endTime, body, meetingType, meetingLink, attendees } = params;
   const eventData: any = {};
 
   if (subject) eventData.subject = subject;
   if (startTime) eventData.start = { dateTime: startTime.toISOString(), timeZone: "UTC" };
   if (endTime) eventData.end = { dateTime: endTime.toISOString(), timeZone: "UTC" };
-  if (body !== undefined) eventData.body = { contentType: "text", content: body };
+
+  if (body !== undefined || meetingType !== undefined || meetingLink !== undefined) {
+    let eventBodyHtml = "";
+    const descriptionText = body || subject || "";
+    if (descriptionText) {
+      eventBodyHtml += `<p>${descriptionText.replace(/\n/g, "<br>")}</p>`;
+    }
+    if (meetingType?.toLowerCase() === "zoom" && meetingLink) {
+      eventBodyHtml += `<p><strong>Zoom Meeting</strong></p>`;
+      eventBodyHtml += `<p><a href="${meetingLink}">Join Zoom Meeting</a></p>`;
+      eventBodyHtml += `<p>${meetingLink}</p>`;
+    } else if (meetingType?.toLowerCase() === "google meet" && meetingLink) {
+      eventBodyHtml += `<p><strong>Google Meet</strong></p>`;
+      eventBodyHtml += `<p><a href="${meetingLink}">Join Google Meet</a></p>`;
+      eventBodyHtml += `<p>${meetingLink}</p>`;
+    }
+    eventData.body = { contentType: "html", content: eventBodyHtml };
+  }
+
   if (attendees) {
     eventData.attendees = [
       { type: "resource", emailAddress: { address: roomEmail, name: "Conference Room" } },
