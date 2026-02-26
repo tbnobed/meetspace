@@ -23,8 +23,35 @@ import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { EQUIPMENT_OPTIONS, getTimezoneAbbr } from "@/lib/constants";
-import { Plus, DoorOpen, Users, Building2, Pencil, RefreshCw, Cloud, Mail, CheckCircle2, Loader2, Download, Calendar } from "lucide-react";
+import { Plus, DoorOpen, Users, Building2, Pencil, RefreshCw, Cloud, Mail, CheckCircle2, Loader2, Download, Calendar, Wifi, WifiOff } from "lucide-react";
 import type { Facility, RoomWithFacility } from "@shared/schema";
+
+interface GraphSubscriptionInfo {
+  id: string;
+  roomId: string;
+  roomEmail: string;
+  status: string;
+  lastNotificationAt: string | null;
+  expirationDateTime: string;
+  roomName: string;
+  facilityName: string;
+  isExpired: boolean;
+  lastError: string | null;
+}
+
+function formatRelativeTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
 const roomFormSchema = z.object({
   name: z.string().min(1, "Room name is required"),
@@ -493,6 +520,13 @@ export default function AdminRooms() {
   const { data: rooms, isLoading: roomsLoading } = useQuery<RoomWithFacility[]>({ queryKey: ["/api/rooms"] });
   const { data: facilities } = useQuery<Facility[]>({ queryKey: ["/api/facilities"] });
   const { data: graphStatus } = useQuery<{ configured: boolean }>({ queryKey: ["/api/graph/status"] });
+  const { data: subscriptions } = useQuery<GraphSubscriptionInfo[]>({
+    queryKey: ["/api/graph/subscriptions"],
+    enabled: !!graphStatus?.configured,
+  });
+
+  const subsByRoomId = new Map<string, GraphSubscriptionInfo>();
+  subscriptions?.forEach((sub) => subsByRoomId.set(sub.roomId, sub));
 
   const handleEdit = (room: RoomWithFacility) => {
     setEditRoom(room);
@@ -551,6 +585,7 @@ export default function AdminRooms() {
                   <TableHead>Capacity</TableHead>
                   <TableHead>Floor</TableHead>
                   <TableHead>Equipment</TableHead>
+                  {graphStatus?.configured && <TableHead>Last Sync</TableHead>}
                   <TableHead>Status</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
@@ -593,6 +628,58 @@ export default function AdminRooms() {
                         )}
                       </div>
                     </TableCell>
+                    {graphStatus?.configured && (
+                      <TableCell>
+                        {room.msGraphRoomEmail ? (() => {
+                          const sub = subsByRoomId.get(room.id);
+                          if (!sub) {
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <WifiOff className="w-3 h-3" />
+                                    No subscription
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent><p className="text-xs">No webhook subscription for this room</p></TooltipContent>
+                              </Tooltip>
+                            );
+                          }
+                          if (sub.lastNotificationAt) {
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400" data-testid={`text-last-sync-${room.id}`}>
+                                    <Wifi className="w-3 h-3" />
+                                    {formatRelativeTime(sub.lastNotificationAt)}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-xs">Last sync: {new Date(sub.lastNotificationAt).toLocaleString()}</p>
+                                  <p className="text-xs text-muted-foreground">Status: {sub.status}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          }
+                          return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                                  <Wifi className="w-3 h-3" />
+                                  Listening
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Webhook active, no events received yet</p>
+                                <p className="text-xs text-muted-foreground">Status: {sub.status}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })() : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Badge variant={room.isActive ? "default" : "secondary"} className="text-[10px]">
                         {room.isActive ? "Active" : "Inactive"}
