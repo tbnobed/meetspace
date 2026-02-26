@@ -261,6 +261,7 @@ function QuickBookDialog({
                       <SelectItem value="none">No virtual meeting</SelectItem>
                       <SelectItem value="teams">Microsoft Teams</SelectItem>
                       <SelectItem value="zoom">Zoom</SelectItem>
+                      <SelectItem value="other">Other (Google Meet, Webex, etc.)</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -278,14 +279,14 @@ function QuickBookDialog({
                       <div className="flex items-center gap-2">
                         <Link2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                         <Input
-                          placeholder={form.watch("meetingType") === "zoom" ? "https://zoom.us/j/..." : "https://teams.microsoft.com/l/..."}
+                          placeholder={form.watch("meetingType") === "zoom" ? "https://zoom.us/j/..." : form.watch("meetingType") === "other" ? "https://meet.google.com/... or other link" : "https://teams.microsoft.com/l/..."}
                           {...field}
                           data-testid="input-quick-meeting-link"
                         />
                       </div>
                     </FormControl>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Paste your {form.watch("meetingType") === "zoom" ? "Zoom" : "Teams"} meeting link
+                      Paste your meeting link — it will be included in the calendar invite
                     </p>
                     <FormMessage />
                   </FormItem>

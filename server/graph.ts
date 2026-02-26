@@ -153,16 +153,15 @@ export async function createCalendarEvent(params: CreateEventParams): Promise<{ 
   const descriptionText = body || `Meeting: ${subject}`;
   eventBodyHtml += `<p>${descriptionText.replace(/\n/g, "<br>")}</p>`;
 
-  if (meetingType?.toLowerCase() === "zoom" && meetingLink) {
-    eventBodyHtml += `<p><strong>Zoom Meeting</strong></p>`;
-    eventBodyHtml += `<p><a href="${meetingLink}">Join Zoom Meeting</a></p>`;
+  if (meetingLink) {
+    const platformLabel = meetingType?.toLowerCase() === "zoom" ? "Zoom Meeting"
+      : meetingType?.toLowerCase() === "google meet" ? "Google Meet"
+      : "Virtual Meeting";
+    eventBodyHtml += `<p><strong>${platformLabel}</strong></p>`;
+    eventBodyHtml += `<p><a href="${meetingLink}">Join ${platformLabel}</a></p>`;
     eventBodyHtml += `<p>${meetingLink}</p>`;
   } else if (meetingType?.toLowerCase() === "zoom") {
     eventBodyHtml += `<p><strong>Meeting Type:</strong> Zoom</p>`;
-  } else if (meetingType?.toLowerCase() === "google meet" && meetingLink) {
-    eventBodyHtml += `<p><strong>Google Meet</strong></p>`;
-    eventBodyHtml += `<p><a href="${meetingLink}">Join Google Meet</a></p>`;
-    eventBodyHtml += `<p>${meetingLink}</p>`;
   }
 
   const eventData: any = {
@@ -228,13 +227,12 @@ export async function updateCalendarEvent(params: {
     if (descriptionText) {
       eventBodyHtml += `<p>${descriptionText.replace(/\n/g, "<br>")}</p>`;
     }
-    if (meetingType?.toLowerCase() === "zoom" && meetingLink) {
-      eventBodyHtml += `<p><strong>Zoom Meeting</strong></p>`;
-      eventBodyHtml += `<p><a href="${meetingLink}">Join Zoom Meeting</a></p>`;
-      eventBodyHtml += `<p>${meetingLink}</p>`;
-    } else if (meetingType?.toLowerCase() === "google meet" && meetingLink) {
-      eventBodyHtml += `<p><strong>Google Meet</strong></p>`;
-      eventBodyHtml += `<p><a href="${meetingLink}">Join Google Meet</a></p>`;
+    if (meetingLink) {
+      const platformLabel = meetingType?.toLowerCase() === "zoom" ? "Zoom Meeting"
+        : meetingType?.toLowerCase() === "google meet" ? "Google Meet"
+        : "Virtual Meeting";
+      eventBodyHtml += `<p><strong>${platformLabel}</strong></p>`;
+      eventBodyHtml += `<p><a href="${meetingLink}">Join ${platformLabel}</a></p>`;
       eventBodyHtml += `<p>${meetingLink}</p>`;
     }
     eventData.body = { contentType: "html", content: eventBodyHtml };

@@ -163,6 +163,7 @@ function normalizeMeetingType(mt: string | null | undefined): string {
 function meetingTypeLabel(mt: string): string {
   if (mt === "teams") return "Teams Meeting";
   if (mt === "zoom") return "Zoom";
+  if (mt === "other") return "Other Platform";
   return "No virtual meeting";
 }
 
@@ -209,7 +210,7 @@ function EditBookingDialog({
         startTime,
         endTime,
         meetingType,
-        meetingLink: meetingType === "zoom" ? meetingLink : null,
+        meetingLink: meetingType !== "none" && meetingType !== "teams" ? meetingLink : null,
         attendees: attendeesArr,
       });
     },
@@ -305,19 +306,21 @@ function EditBookingDialog({
                 <SelectItem value="none">No virtual meeting</SelectItem>
                 <SelectItem value="teams">Teams Meeting</SelectItem>
                 <SelectItem value="zoom">Zoom</SelectItem>
+                <SelectItem value="other">Other (Google Meet, Webex, etc.)</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          {meetingType === "zoom" && (
+          {(meetingType === "zoom" || meetingType === "other") && (
             <div className="space-y-2">
-              <Label htmlFor="edit-meeting-link">Zoom Link</Label>
+              <Label htmlFor="edit-meeting-link">Meeting Link</Label>
               <Input
                 id="edit-meeting-link"
                 value={meetingLink}
                 onChange={(e) => setMeetingLink(e.target.value)}
-                placeholder="https://zoom.us/j/..."
+                placeholder={meetingType === "zoom" ? "https://zoom.us/j/..." : "https://meet.google.com/... or other link"}
                 data-testid="input-edit-meeting-link"
               />
+              <p className="text-xs text-muted-foreground">This link will be included in the calendar invite sent to attendees</p>
             </div>
           )}
           <div className="space-y-2">
