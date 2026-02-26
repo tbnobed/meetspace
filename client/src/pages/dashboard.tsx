@@ -292,7 +292,7 @@ function MonthView({
             return (
               <div
                 key={di}
-                className={`min-h-[140px] border-r last:border-r-0 p-1.5 cursor-pointer hover-elevate ${
+                className={`min-h-[180px] border-r last:border-r-0 p-1.5 cursor-pointer hover-elevate ${
                   !isCurrentMonth ? "bg-muted/20" : ""
                 }`}
                 onClick={() => onDayClick(day)}
@@ -391,7 +391,7 @@ function WeekView({
           );
         })}
       </div>
-      <div className="overflow-y-auto max-h-[600px]">
+      <div className="overflow-y-auto max-h-[calc(100vh-320px)]">
         {hours.map((hour) => (
           <div key={hour} className="grid grid-cols-[60px_repeat(7,1fr)] border-b last:border-b-0">
             <div className="p-1.5 text-xs text-muted-foreground text-right pr-2 pt-0 -mt-2">
@@ -487,7 +487,7 @@ function DayView({
           </Badge>
         </div>
       </div>
-      <div className="overflow-y-auto max-h-[600px]">
+      <div className="overflow-y-auto max-h-[calc(100vh-320px)]">
         <div className="flex">
           <div className="w-16 flex-shrink-0">
             {hours.map((hour) => (
