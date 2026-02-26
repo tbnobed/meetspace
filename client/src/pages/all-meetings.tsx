@@ -268,7 +268,32 @@ function QuickBookDialog({
                 </FormItem>
               )}
             />
-            {form.watch("meetingType") !== "none" && (
+            {form.watch("meetingType") === "teams" && (
+              <FormField
+                control={form.control}
+                name="meetingLink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Existing Teams Link <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <Link2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <Input
+                          placeholder="https://teams.microsoft.com/l/meetup-join/..."
+                          {...field}
+                          data-testid="input-quick-meeting-link"
+                        />
+                      </div>
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Already have a Teams link? Paste it here. Leave blank to auto-generate one.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {(form.watch("meetingType") === "zoom" || form.watch("meetingType") === "other") && (
               <FormField
                 control={form.control}
                 name="meetingLink"
@@ -279,7 +304,7 @@ function QuickBookDialog({
                       <div className="flex items-center gap-2">
                         <Link2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                         <Input
-                          placeholder={form.watch("meetingType") === "zoom" ? "https://zoom.us/j/..." : form.watch("meetingType") === "other" ? "https://meet.google.com/... or other link" : "https://teams.microsoft.com/l/..."}
+                          placeholder={form.watch("meetingType") === "zoom" ? "https://zoom.us/j/..." : "https://meet.google.com/... or other link"}
                           {...field}
                           data-testid="input-quick-meeting-link"
                         />

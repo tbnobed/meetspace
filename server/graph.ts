@@ -154,7 +154,8 @@ export async function createCalendarEvent(params: CreateEventParams): Promise<{ 
   eventBodyHtml += `<p>${descriptionText.replace(/\n/g, "<br>")}</p>`;
 
   if (meetingLink) {
-    const platformLabel = meetingType?.toLowerCase() === "zoom" ? "Zoom Meeting"
+    const platformLabel = meetingType?.toLowerCase() === "teams" ? "Teams Meeting"
+      : meetingType?.toLowerCase() === "zoom" ? "Zoom Meeting"
       : meetingType?.toLowerCase() === "google meet" ? "Google Meet"
       : "Virtual Meeting";
     eventBodyHtml += `<p><strong>${platformLabel}</strong></p>`;
@@ -186,7 +187,7 @@ export async function createCalendarEvent(params: CreateEventParams): Promise<{ 
     },
   };
 
-  if (isTeamsMeeting) {
+  if (isTeamsMeeting && !meetingLink) {
     eventData.isOnlineMeeting = true;
     eventData.onlineMeetingProvider = "teamsForBusiness";
   }
@@ -228,7 +229,8 @@ export async function updateCalendarEvent(params: {
       eventBodyHtml += `<p>${descriptionText.replace(/\n/g, "<br>")}</p>`;
     }
     if (meetingLink) {
-      const platformLabel = meetingType?.toLowerCase() === "zoom" ? "Zoom Meeting"
+      const platformLabel = meetingType?.toLowerCase() === "teams" ? "Teams Meeting"
+        : meetingType?.toLowerCase() === "zoom" ? "Zoom Meeting"
         : meetingType?.toLowerCase() === "google meet" ? "Google Meet"
         : "Virtual Meeting";
       eventBodyHtml += `<p><strong>${platformLabel}</strong></p>`;

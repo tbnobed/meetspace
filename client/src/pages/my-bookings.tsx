@@ -210,7 +210,7 @@ function EditBookingDialog({
         startTime,
         endTime,
         meetingType,
-        meetingLink: meetingType !== "none" && meetingType !== "teams" ? meetingLink : null,
+        meetingLink: meetingType !== "none" ? meetingLink || null : null,
         attendees: attendeesArr,
       });
     },
@@ -310,6 +310,19 @@ function EditBookingDialog({
               </SelectContent>
             </Select>
           </div>
+          {meetingType === "teams" && (
+            <div className="space-y-2">
+              <Label htmlFor="edit-meeting-link">Existing Teams Link <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input
+                id="edit-meeting-link"
+                value={meetingLink}
+                onChange={(e) => setMeetingLink(e.target.value)}
+                placeholder="https://teams.microsoft.com/l/meetup-join/..."
+                data-testid="input-edit-meeting-link"
+              />
+              <p className="text-xs text-muted-foreground">Already have a Teams link? Paste it here. Leave blank to auto-generate one.</p>
+            </div>
+          )}
           {(meetingType === "zoom" || meetingType === "other") && (
             <div className="space-y-2">
               <Label htmlFor="edit-meeting-link">Meeting Link</Label>
