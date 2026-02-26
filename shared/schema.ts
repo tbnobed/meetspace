@@ -98,6 +98,25 @@ export const auditLogs = pgTable("audit_logs", {
   timestamp: timestamp("timestamp", { withTimezone: true }).notNull().default(sql`now()`),
 });
 
+export const securityGroups = pgTable("security_groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+});
+
+export const securityGroupMembers = pgTable("security_group_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull().references(() => securityGroups.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+});
+
+export const securityGroupRooms = pgTable("security_group_rooms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull().references(() => securityGroups.id, { onDelete: "cascade" }),
+  roomId: varchar("room_id").notNull().references(() => rooms.id, { onDelete: "cascade" }),
+});
+
 // Insert schemas
 export const insertFacilitySchema = createInsertSchema(facilities).omit({ id: true });
 export const insertRoomSchema = createInsertSchema(rooms).omit({ id: true });
@@ -114,6 +133,9 @@ export const insertRoomTabletSchema = createInsertSchema(roomTablets).omit({ id:
 export const insertUserFacilityAssignmentSchema = createInsertSchema(userFacilityAssignments).omit({ id: true });
 export const insertGraphSubscriptionSchema = createInsertSchema(graphSubscriptions).omit({ id: true, createdAt: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, timestamp: true });
+export const insertSecurityGroupSchema = createInsertSchema(securityGroups).omit({ id: true, createdAt: true });
+export const insertSecurityGroupMemberSchema = createInsertSchema(securityGroupMembers).omit({ id: true });
+export const insertSecurityGroupRoomSchema = createInsertSchema(securityGroupRooms).omit({ id: true });
 
 // Types
 export type Facility = typeof facilities.$inferSelect;
@@ -132,6 +154,10 @@ export type GraphSubscription = typeof graphSubscriptions.$inferSelect;
 export type InsertGraphSubscription = z.infer<typeof insertGraphSubscriptionSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type SecurityGroup = typeof securityGroups.$inferSelect;
+export type InsertSecurityGroup = z.infer<typeof insertSecurityGroupSchema>;
+export type SecurityGroupMember = typeof securityGroupMembers.$inferSelect;
+export type SecurityGroupRoom = typeof securityGroupRooms.$inferSelect;
 
 // Extended types for frontend
 export type RoomWithFacility = Room & { facility: Facility };

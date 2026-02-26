@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, CalendarPlus, CalendarDays, DoorOpen, Building2, Users, ClipboardList, Settings, LogOut, List, Webhook, Tablet } from "lucide-react";
+import { LayoutDashboard, CalendarPlus, CalendarDays, DoorOpen, Building2, Users, ClipboardList, Settings, LogOut, List, Webhook, Tablet, Shield } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -28,6 +28,7 @@ const adminNav = [
   { title: "Rooms", url: "/admin/rooms", icon: DoorOpen },
   { title: "Facilities", url: "/admin/facilities", icon: Building2 },
   { title: "Users", url: "/admin/users", icon: Users },
+  { title: "Security Groups", url: "/admin/security-groups", icon: Shield },
   { title: "Webhooks", url: "/admin/webhooks", icon: Webhook },
   { title: "Tablets", url: "/admin/tablets", icon: Tablet },
   { title: "Audit Log", url: "/admin/audit", icon: Settings },

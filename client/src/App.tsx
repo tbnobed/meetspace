@@ -20,6 +20,7 @@ import AdminUsers from "@/pages/admin/users";
 import AdminAuditLog from "@/pages/admin/audit-log";
 import AdminWebhooks from "@/pages/admin/webhooks";
 import AdminTablets from "@/pages/admin/tablets";
+import AdminSecurityGroups from "@/pages/admin/security-groups";
 import AllMeetings from "@/pages/all-meetings";
 import AuthPage from "@/pages/auth";
 import TabletLogin from "@/pages/tablet-login";
@@ -82,6 +83,7 @@ function AuthenticatedLayout() {
                 <Route path="/admin/audit">{() => <AdminRoute component={AdminAuditLog} />}</Route>
                 <Route path="/admin/webhooks">{() => <AdminRoute component={AdminWebhooks} />}</Route>
                 <Route path="/admin/tablets">{() => <AdminRoute component={AdminTablets} />}</Route>
+                <Route path="/admin/security-groups">{() => <AdminRoute component={AdminSecurityGroups} />}</Route>
                 <Route component={NotFound} />
               </Switch>
             </main>

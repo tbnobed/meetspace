@@ -122,7 +122,9 @@ export default function BookRoom() {
   const isSiteAdmin = user?.role === "site_admin";
 
   const { data: facilities } = useQuery<Facility[]>({ queryKey: ["/api/facilities"] });
-  const { data: rooms, isLoading } = useQuery<RoomWithFacility[]>({ queryKey: ["/api/rooms"] });
+  const { data: rooms, isLoading } = useQuery<RoomWithFacility[]>({
+    queryKey: [user ? "/api/rooms/accessible" : "/api/rooms"],
+  });
 
   useEffect(() => {
     if (preselectedRoom && rooms) {

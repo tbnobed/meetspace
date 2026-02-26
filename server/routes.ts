@@ -273,6 +273,16 @@ export async function registerRoutes(
       }
     }
 
+    if (userId) {
+      const bookingUser = await storage.getUser(userId);
+      if (bookingUser && bookingUser.role !== "admin") {
+        const accessibleIds = await storage.getUserAccessibleRoomIds(userId);
+        if (accessibleIds !== null && !accessibleIds.includes(req.body.roomId)) {
+          return res.status(403).json({ message: "You do not have access to book this room" });
+        }
+      }
+    }
+
     const bodyWithUser = {
       ...req.body,
       userId,
@@ -1152,6 +1162,81 @@ export async function registerRoutes(
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to import calendar events" });
     }
+  });
+
+  // ── Security Groups (Admin) ──
+  app.get("/api/security-groups", requireAdmin, async (_req, res) => {
+    const groups = await storage.getSecurityGroups();
+    const result = await Promise.all(groups.map(async (g) => {
+      const members = await storage.getSecurityGroupMembers(g.id);
+      const groupRooms = await storage.getSecurityGroupRooms(g.id);
+      return { ...g, memberCount: members.length, roomCount: groupRooms.length };
+    }));
+    res.json(result);
+  });
+
+  app.get("/api/security-groups/:id", requireAdmin, async (req, res) => {
+    const group = await storage.getSecurityGroup(req.params.id);
+    if (!group) return res.status(404).json({ message: "Security group not found" });
+    const members = await storage.getSecurityGroupMembers(group.id);
+    const groupRooms = await storage.getSecurityGroupRooms(group.id);
+    res.json({ ...group, memberIds: members.map((m) => m.userId), roomIds: groupRooms.map((r) => r.roomId) });
+  });
+
+  app.post("/api/security-groups", requireAdmin, async (req, res) => {
+    const { name, description } = req.body;
+    if (!name) return res.status(400).json({ message: "Name is required" });
+    const group = await storage.createSecurityGroup({ name, description: description || null });
+    res.json(group);
+  });
+
+  app.patch("/api/security-groups/:id", requireAdmin, async (req, res) => {
+    const { name, description } = req.body;
+    const group = await storage.updateSecurityGroup(req.params.id, { name, description });
+    if (!group) return res.status(404).json({ message: "Security group not found" });
+    res.json(group);
+  });
+
+  app.delete("/api/security-groups/:id", requireAdmin, async (req, res) => {
+    const deleted = await storage.deleteSecurityGroup(req.params.id);
+    if (!deleted) return res.status(404).json({ message: "Security group not found" });
+    res.json({ success: true });
+  });
+
+  app.put("/api/security-groups/:id/members", requireAdmin, async (req, res) => {
+    const { userIds } = req.body;
+    if (!Array.isArray(userIds)) return res.status(400).json({ message: "userIds must be an array" });
+    const group = await storage.getSecurityGroup(req.params.id);
+    if (!group) return res.status(404).json({ message: "Security group not found" });
+    const members = await storage.setSecurityGroupMembers(req.params.id, userIds);
+    res.json(members);
+  });
+
+  app.put("/api/security-groups/:id/rooms", requireAdmin, async (req, res) => {
+    const { roomIds } = req.body;
+    if (!Array.isArray(roomIds)) return res.status(400).json({ message: "roomIds must be an array" });
+    const group = await storage.getSecurityGroup(req.params.id);
+    if (!group) return res.status(404).json({ message: "Security group not found" });
+    const groupRooms = await storage.setSecurityGroupRooms(req.params.id, roomIds);
+    res.json(groupRooms);
+  });
+
+  app.get("/api/rooms/accessible", requireAuth, async (req, res) => {
+    const userId = req.session.userId as string;
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(401).json({ message: "User not found" });
+    if (user.role === "admin") {
+      const allRooms = await storage.getRooms();
+      return res.json(allRooms);
+    }
+    const accessibleIds = await storage.getUserAccessibleRoomIds(userId);
+    if (accessibleIds === null) {
+      const allRooms = await storage.getRooms();
+      return res.json(allRooms);
+    }
+    const allRooms = await storage.getRooms();
+    const filtered = allRooms.filter((r) => accessibleIds.includes(r.id));
+    res.json(filtered);
   });
 
   // ── Graph Webhook Endpoint (public - called by Microsoft) ──

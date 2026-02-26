@@ -346,7 +346,7 @@ function QuickBookDialog({
   );
 }
 
-function RoomAvailabilityCard({ room, bookings }: { room: RoomWithFacility; bookings: BookingWithDetails[] }) {
+function RoomAvailabilityCard({ room, bookings, canBook }: { room: RoomWithFacility; bookings: BookingWithDetails[]; canBook: boolean }) {
   const [bookDialogOpen, setBookDialogOpen] = useState(false);
   const { user } = useAuth();
   const now = new Date();
@@ -408,7 +408,7 @@ function RoomAvailabilityCard({ room, bookings }: { room: RoomWithFacility; book
               <p className="text-muted-foreground">No upcoming bookings</p>
             </div>
           )}
-          {isAvailable && user && (
+          {isAvailable && user && canBook && (
             <Button
               variant="outline"
               size="sm"
@@ -460,6 +460,9 @@ export default function AllMeetings() {
   const { data: rooms, isLoading: roomsLoading } = useQuery<RoomWithFacility[]>({
     queryKey: ["/api/rooms"],
   });
+  const { data: accessibleRooms } = useQuery<RoomWithFacility[]>({
+    queryKey: ["/api/rooms/accessible"],
+  });
   const { data: bookings, isLoading: bookingsLoading } = useQuery<BookingWithDetails[]>({
     queryKey: ["/api/bookings/today"],
   });
@@ -503,7 +506,7 @@ export default function AllMeetings() {
           <ScrollArea className="w-full">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {rooms?.map((room) => (
-                <RoomAvailabilityCard key={room.id} room={room} bookings={bookings || []} />
+                <RoomAvailabilityCard key={room.id} room={room} bookings={bookings || []} canBook={!accessibleRooms || accessibleRooms.some((ar) => ar.id === room.id)} />
               ))}
             </div>
           </ScrollArea>
@@ -528,7 +531,7 @@ export default function AllMeetings() {
               {rooms
                 ?.filter((r) => r.facilityId === facility.id)
                 .map((room) => (
-                  <RoomAvailabilityCard key={room.id} room={room} bookings={bookings || []} />
+                  <RoomAvailabilityCard key={room.id} room={room} bookings={bookings || []} canBook={!accessibleRooms || accessibleRooms.some((ar) => ar.id === room.id)} />
                 ))}
             </div>
             {rooms?.filter((r) => r.facilityId === facility.id).length === 0 && (

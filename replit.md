@@ -42,6 +42,7 @@ Conference room management system for a multi-facility organization with ~20 con
 - `/admin/rooms` - Room CRUD management (admin only)
 - `/admin/facilities` - Facility CRUD management (admin only)
 - `/admin/users` - User CRUD management (admin only)
+- `/admin/security-groups` - Security group management for room access control (admin only)
 - `/admin/webhooks` - Calendar webhook subscription management (admin only)
 - `/admin/tablets` - Tablet kiosk credential management (admin only)
 - `/admin/audit` - Audit log viewer (admin only)
@@ -54,6 +55,9 @@ Conference room management system for a multi-facility organization with ~20 con
 - **Bookings**: Time-slot bookings with conflict detection, meeting type (Teams/Zoom/None), optional bookedForName/bookedForEmail for site admin bookings
 - **Users**: Admin, user, and site_admin roles, bcrypt-hashed passwords, `approved` boolean (default false for self-registration, true for admin-created/guest users)
 - **User Facility Assignments**: Junction table mapping site_admin users to their assigned facilities (many-to-many)
+- **Security Groups**: Named groups of users with room access assignments
+- **Security Group Members**: Junction table mapping users to security groups (many-to-many)
+- **Security Group Rooms**: Junction table mapping rooms to security groups (many-to-many). If a room has no groups assigned, it's open to everyone. If a room has at least one group, only members of those groups (+ admins) can book it.
 - **Room Tablets**: Tablet kiosk credentials per room (username, password, displayName, isActive)
 - **Audit Logs**: Track all system changes
 
@@ -103,6 +107,14 @@ All routes prefixed with `/api/`:
 - `GET /api/users/:id/facility-assignments` - Get user facility assignments
 - `PUT /api/users/:id/facility-assignments` - Set user facility assignments
 - `GET /api/audit-logs`
+- `GET /api/security-groups` - List security groups with member/room counts
+- `GET /api/security-groups/:id` - Get group detail with memberIds and roomIds
+- `POST /api/security-groups` - Create security group
+- `PATCH /api/security-groups/:id` - Update security group
+- `DELETE /api/security-groups/:id` - Delete security group
+- `PUT /api/security-groups/:id/members` - Set group members (userIds array)
+- `PUT /api/security-groups/:id/rooms` - Set group rooms (roomIds array)
+- `GET /api/rooms/accessible` - Get rooms current user can book (based on security group membership)
 
 ## Email Notifications (SendGrid)
 - **SENDGRID_API_KEY**: Required secret for sending emails

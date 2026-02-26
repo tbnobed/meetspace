@@ -2,6 +2,7 @@ import { eq, and, gte, lte, or, desc, ne, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   facilities, rooms, users, bookings, auditLogs, userFacilityAssignments, graphSubscriptions, roomTablets,
+  securityGroups, securityGroupMembers, securityGroupRooms,
   type Facility, type InsertFacility,
   type Room, type InsertRoom,
   type User, type InsertUser,
@@ -11,6 +12,8 @@ import {
   type RoomTablet, type InsertRoomTablet,
   type GraphSubscription, type InsertGraphSubscription,
   type RoomWithFacility, type BookingWithDetails,
+  type SecurityGroup, type InsertSecurityGroup,
+  type SecurityGroupMember, type SecurityGroupRoom,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -80,6 +83,19 @@ export interface IStorage {
   createRoomTablet(data: InsertRoomTablet): Promise<RoomTablet>;
   updateRoomTablet(id: string, data: Partial<InsertRoomTablet>): Promise<RoomTablet | undefined>;
   deleteRoomTablet(id: string): Promise<boolean>;
+
+  // Security Groups
+  getSecurityGroups(): Promise<SecurityGroup[]>;
+  getSecurityGroup(id: string): Promise<SecurityGroup | undefined>;
+  createSecurityGroup(data: InsertSecurityGroup): Promise<SecurityGroup>;
+  updateSecurityGroup(id: string, data: Partial<InsertSecurityGroup>): Promise<SecurityGroup | undefined>;
+  deleteSecurityGroup(id: string): Promise<boolean>;
+  getSecurityGroupMembers(groupId: string): Promise<SecurityGroupMember[]>;
+  setSecurityGroupMembers(groupId: string, userIds: string[]): Promise<SecurityGroupMember[]>;
+  getSecurityGroupRooms(groupId: string): Promise<SecurityGroupRoom[]>;
+  setSecurityGroupRooms(groupId: string, roomIds: string[]): Promise<SecurityGroupRoom[]>;
+  getUserAccessibleRoomIds(userId: string): Promise<string[] | null>;
+  getRoomsWithNoGroupRestrictions(): Promise<string[]>;
 
   // Audit
   getAuditLogs(): Promise<(AuditLog & { user?: Pick<User, "id" | "displayName" | "email"> })[]>;
@@ -468,6 +484,82 @@ export class DatabaseStorage implements IStorage {
   async deleteRoomTablet(id: string): Promise<boolean> {
     const result = await db.delete(roomTablets).where(eq(roomTablets.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Security Groups
+  async getSecurityGroups(): Promise<SecurityGroup[]> {
+    return db.select().from(securityGroups).orderBy(securityGroups.name);
+  }
+
+  async getSecurityGroup(id: string): Promise<SecurityGroup | undefined> {
+    const [result] = await db.select().from(securityGroups).where(eq(securityGroups.id, id));
+    return result;
+  }
+
+  async createSecurityGroup(data: InsertSecurityGroup): Promise<SecurityGroup> {
+    const [result] = await db.insert(securityGroups).values(data).returning();
+    return result;
+  }
+
+  async updateSecurityGroup(id: string, data: Partial<InsertSecurityGroup>): Promise<SecurityGroup | undefined> {
+    const [result] = await db.update(securityGroups).set(data).where(eq(securityGroups.id, id)).returning();
+    return result;
+  }
+
+  async deleteSecurityGroup(id: string): Promise<boolean> {
+    const result = await db.delete(securityGroups).where(eq(securityGroups.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getSecurityGroupMembers(groupId: string): Promise<SecurityGroupMember[]> {
+    return db.select().from(securityGroupMembers).where(eq(securityGroupMembers.groupId, groupId));
+  }
+
+  async setSecurityGroupMembers(groupId: string, userIds: string[]): Promise<SecurityGroupMember[]> {
+    await db.delete(securityGroupMembers).where(eq(securityGroupMembers.groupId, groupId));
+    if (userIds.length === 0) return [];
+    const values = userIds.map((userId) => ({ groupId, userId }));
+    return db.insert(securityGroupMembers).values(values).returning();
+  }
+
+  async getSecurityGroupRooms(groupId: string): Promise<SecurityGroupRoom[]> {
+    return db.select().from(securityGroupRooms).where(eq(securityGroupRooms.groupId, groupId));
+  }
+
+  async setSecurityGroupRooms(groupId: string, roomIds: string[]): Promise<SecurityGroupRoom[]> {
+    await db.delete(securityGroupRooms).where(eq(securityGroupRooms.groupId, groupId));
+    if (roomIds.length === 0) return [];
+    const values = roomIds.map((roomId) => ({ groupId, roomId }));
+    return db.insert(securityGroupRooms).values(values).returning();
+  }
+
+  async getUserAccessibleRoomIds(userId: string): Promise<string[] | null> {
+    const memberships = await db.select({ groupId: securityGroupMembers.groupId })
+      .from(securityGroupMembers)
+      .where(eq(securityGroupMembers.userId, userId));
+    if (memberships.length === 0) {
+      const unrestricted = await this.getRoomsWithNoGroupRestrictions();
+      return unrestricted;
+    }
+    const groupIds = memberships.map((m) => m.groupId);
+    const groupRoomRows = await db.select({ roomId: securityGroupRooms.roomId })
+      .from(securityGroupRooms)
+      .where(inArray(securityGroupRooms.groupId, groupIds));
+    const groupRoomIds = [...new Set(groupRoomRows.map((r) => r.roomId))];
+    const unrestricted = await this.getRoomsWithNoGroupRestrictions();
+    const combined = [...new Set([...groupRoomIds, ...unrestricted])];
+    return combined;
+  }
+
+  async getRoomsWithNoGroupRestrictions(): Promise<string[]> {
+    const restrictedRoomRows = await db.select({ roomId: securityGroupRooms.roomId }).from(securityGroupRooms);
+    const restrictedRoomIds = [...new Set(restrictedRoomRows.map((r) => r.roomId))];
+    if (restrictedRoomIds.length === 0) {
+      const allRooms = await db.select({ id: rooms.id }).from(rooms);
+      return allRooms.map((r) => r.id);
+    }
+    const allRooms = await db.select({ id: rooms.id }).from(rooms);
+    return allRooms.filter((r) => !restrictedRoomIds.includes(r.id)).map((r) => r.id);
   }
 
   // Audit
