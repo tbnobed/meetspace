@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -64,7 +64,10 @@ import {
 import type { BookingWithDetails } from "@shared/schema";
 import { useAuth } from "@/lib/auth";
 
+let roomStatusCounter = 0;
+
 function RoomStatusBadge({ bookingId }: { bookingId: string }) {
+  const staggerRef = useRef(roomStatusCounter++ * 300);
   const { data, isLoading } = useQuery<{
     status: string;
     message?: string;
@@ -72,6 +75,7 @@ function RoomStatusBadge({ bookingId }: { bookingId: string }) {
   }>({
     queryKey: ["/api/bookings", bookingId, "room-status"],
     queryFn: async () => {
+      if (staggerRef.current > 0) await new Promise((r) => setTimeout(r, staggerRef.current));
       const res = await fetch(`/api/bookings/${bookingId}/room-status`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();

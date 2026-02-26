@@ -35,23 +35,60 @@ async function getAccessToken(): Promise<string> {
   return result.accessToken;
 }
 
-async function graphFetch(path: string, options: RequestInit = {}): Promise<any> {
-  const token = await getAccessToken();
-  const url = path.startsWith("http") ? path : `${GRAPH_BASE}${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-  if (!res.ok) {
-    const errorBody = await res.text();
-    throw new Error(`Graph API error ${res.status}: ${errorBody}`);
+const GRAPH_MAX_CONCURRENT = 4;
+let graphActiveRequests = 0;
+const graphQueue: Array<{ resolve: () => void }> = [];
+
+async function graphConcurrencyGate(): Promise<void> {
+  if (graphActiveRequests < GRAPH_MAX_CONCURRENT) {
+    graphActiveRequests++;
+    return;
   }
-  if (res.status === 204) return null;
-  return res.json();
+  return new Promise<void>((resolve) => {
+    graphQueue.push({ resolve });
+  });
+}
+
+function graphConcurrencyRelease(): void {
+  graphActiveRequests--;
+  const next = graphQueue.shift();
+  if (next) {
+    graphActiveRequests++;
+    next.resolve();
+  }
+}
+
+async function graphFetch(path: string, options: RequestInit = {}, retries = 3): Promise<any> {
+  await graphConcurrencyGate();
+  let released = false;
+  try {
+    const token = await getAccessToken();
+    const url = path.startsWith("http") ? path : `${GRAPH_BASE}${path}`;
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    });
+    if (res.status === 429 && retries > 0) {
+      const retryAfter = parseInt(res.headers.get("Retry-After") || "0", 10);
+      const delay = Math.max(retryAfter * 1000, 1000 * (4 - retries));
+      released = true;
+      graphConcurrencyRelease();
+      await new Promise((r) => setTimeout(r, delay));
+      return graphFetch(path, options, retries - 1);
+    }
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw new Error(`Graph API error ${res.status}: ${errorBody}`);
+    }
+    if (res.status === 204) return null;
+    return res.json();
+  } finally {
+    if (!released) graphConcurrencyRelease();
+  }
 }
 
 export function isGraphConfigured(): boolean {
