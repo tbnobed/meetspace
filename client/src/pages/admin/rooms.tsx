@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -85,6 +85,17 @@ function RoomFormDialog({ room, facilities, open, onOpenChange }: {
       isActive: room?.isActive ?? true,
     },
   });
+
+  useEffect(() => {
+    form.reset({
+      name: room?.name || "",
+      facilityId: room?.facilityId || "",
+      capacity: room?.capacity || 10,
+      floor: room?.floor || "",
+      equipment: room?.equipment || [],
+      isActive: room?.isActive ?? true,
+    });
+  }, [room, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: RoomFormValues) => {
