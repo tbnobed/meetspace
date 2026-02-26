@@ -70,7 +70,7 @@ function AuthenticatedLayout() {
             <ThemeToggle />
           </header>
           <ScrollArea className="flex-1">
-            <main className="p-3 sm:p-6 max-w-7xl mx-auto w-full">
+            <main className="p-3 sm:p-6 w-full">
               <Switch>
                 <Route path="/">{() => <ProtectedRoute component={Dashboard} />}</Route>
                 <Route path="/rooms">{() => <ProtectedRoute component={AllMeetings} />}</Route>
