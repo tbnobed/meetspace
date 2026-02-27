@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -32,7 +31,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Users, Shield, Pencil, Trash2, CheckCircle, Clock, Mail, Send, MapPin } from "lucide-react";
+import { Plus, Users, Shield, Pencil, Trash2, CheckCircle, Clock, Mail, Send, MapPin, ChevronsUpDown, Check, X } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import type { User, SecurityGroup } from "@shared/schema";
 
@@ -47,6 +46,87 @@ const userFormSchema = z.object({
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
+
+function MultiSelectGroups({ groups, selectedIds, onToggle, onRemove }: {
+  groups: SecurityGroup[];
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [dropdownOpen]);
+
+  const selectedGroups = groups.filter((g) => selectedIds.includes(g.id));
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setDropdownOpen((prev) => !prev)}
+        className="flex items-center justify-between w-full min-h-[40px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        data-testid="button-security-groups-dropdown"
+      >
+        <div className="flex flex-wrap gap-1 flex-1 min-w-0">
+          {selectedGroups.length > 0 ? selectedGroups.map((g) => (
+            <Badge
+              key={g.id}
+              variant="secondary"
+              className="text-xs flex items-center gap-1"
+              data-testid={`badge-group-${g.id}`}
+            >
+              {g.name}
+              <X
+                className="w-3 h-3 cursor-pointer hover:text-destructive"
+                onClick={(e) => { e.stopPropagation(); onRemove(g.id); }}
+                data-testid={`remove-group-${g.id}`}
+              />
+            </Badge>
+          )) : (
+            <span className="text-muted-foreground">Select security groups...</span>
+          )}
+        </div>
+        <ChevronsUpDown className="w-4 h-4 shrink-0 opacity-50 ml-2" />
+      </button>
+      {dropdownOpen && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-[200px] overflow-y-auto">
+          {groups.length > 0 ? groups.map((group) => (
+            <button
+              key={group.id}
+              type="button"
+              onClick={() => onToggle(group.id)}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent cursor-pointer text-left"
+              data-testid={`option-group-${group.id}`}
+            >
+              <div className="w-4 h-4 flex items-center justify-center">
+                {selectedIds.includes(group.id) && <Check className="w-4 h-4 text-primary" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium">{group.name}</div>
+                {group.description && (
+                  <div className="text-xs text-muted-foreground truncate">{group.description}</div>
+                )}
+              </div>
+            </button>
+          )) : (
+            <p className="text-xs text-muted-foreground text-center py-3">No security groups created yet</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function UserFormDialog({ user, open, onOpenChange }: {
   user?: UserWithDetails;
@@ -218,30 +298,12 @@ function UserFormDialog({ user, open, onOpenChange }: {
             <div>
               <Label className="text-sm font-medium">Security Groups</Label>
               <p className="text-xs text-muted-foreground mb-2">Assign groups to control which rooms this user can book</p>
-              <div className="border rounded-md max-h-[150px] overflow-y-auto">
-                {allGroups.length > 0 ? allGroups.map((group) => (
-                  <label
-                    key={group.id}
-                    className="flex items-center gap-3 px-3 py-2 hover:bg-accent cursor-pointer border-b last:border-b-0"
-                    data-testid={`group-row-${group.id}`}
-                  >
-                    <Checkbox
-                      checked={selectedGroupIds.includes(group.id)}
-                      onCheckedChange={() => toggleGroup(group.id)}
-                      data-testid={`checkbox-group-${group.id}`}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium">{group.name}</div>
-                      {group.description && (
-                        <div className="text-xs text-muted-foreground truncate">{group.description}</div>
-                      )}
-                    </div>
-                  </label>
-                )) : (
-                  <p className="text-xs text-muted-foreground text-center py-3">No security groups created yet</p>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">{selectedGroupIds.length} group{selectedGroupIds.length !== 1 ? "s" : ""} selected</p>
+              <MultiSelectGroups
+                groups={allGroups}
+                selectedIds={selectedGroupIds}
+                onToggle={toggleGroup}
+                onRemove={(id) => setSelectedGroupIds((prev) => prev.filter((g) => g !== id))}
+              />
             </div>
             <Button type="submit" className="w-full" disabled={mutation.isPending} data-testid="button-save-user">
               {mutation.isPending ? "Saving..." : isEdit ? "Update User" : "Create User"}
