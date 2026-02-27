@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -31,7 +31,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Users, Shield, Pencil, Trash2, CheckCircle, Clock, Mail, Send, MapPin, ChevronsUpDown, Check, X } from "lucide-react";
+import { Plus, Users, Shield, Pencil, Trash2, CheckCircle, Clock, Mail, Send, MapPin, ChevronsUpDown, Check, X, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import type { User, SecurityGroup } from "@shared/schema";
 
@@ -466,14 +466,107 @@ function getRoleBadge(role: string) {
   }
 }
 
+type SortField = "name" | "email" | "role" | "status";
+type SortDir = "asc" | "desc";
+const PAGE_SIZE = 10;
+
+function SortableHead({ label, field, sortField, sortDir, onSort }: {
+  label: string;
+  field: SortField;
+  sortField: SortField;
+  sortDir: SortDir;
+  onSort: (field: SortField) => void;
+}) {
+  return (
+    <TableHead>
+      <button
+        type="button"
+        className="flex items-center gap-1 hover:text-foreground transition-colors"
+        onClick={() => onSort(field)}
+        data-testid={`sort-${field}`}
+      >
+        {label}
+        {sortField === field ? (
+          sortDir === "asc" ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />
+        ) : (
+          <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />
+        )}
+      </button>
+    </TableHead>
+  );
+}
+
 export default function AdminUsers() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserWithDetails | undefined>();
   const [deleteUser, setDeleteUser] = useState<UserWithDetails | undefined>();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [roleFilter, setRoleFilter] = useState("all");
   const { toast } = useToast();
 
   const { data: users, isLoading } = useQuery<UserWithDetails[]>({ queryKey: ["/api/users"] });
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+    setCurrentPage(1);
+  };
+
+  const filteredAndSorted = useMemo(() => {
+    if (!users) return [];
+    let result = [...users];
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((u) =>
+        u.displayName.toLowerCase().includes(q) ||
+        u.username.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.securityGroupNames ?? []).some((g) => g.toLowerCase().includes(q))
+      );
+    }
+
+    if (roleFilter !== "all") {
+      result = result.filter((u) => u.role === roleFilter);
+    }
+
+    result.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case "name":
+          cmp = a.displayName.localeCompare(b.displayName);
+          break;
+        case "email":
+          cmp = a.email.localeCompare(b.email);
+          break;
+        case "role":
+          cmp = a.role.localeCompare(b.role);
+          break;
+        case "status":
+          cmp = (a.approved ? 1 : 0) - (b.approved ? 1 : 0);
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return result;
+  }, [users, searchQuery, roleFilter, sortField, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedUsers = filteredAndSorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, roleFilter]);
 
   const approveMutation = useMutation({
     mutationFn: async ({ id, approved }: { id: string; approved: boolean }) => {
@@ -541,96 +634,172 @@ export default function AdminUsers() {
         }
       />
 
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, username, email, or group..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="input-search-users"
+          />
+        </div>
+        <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-full sm:w-[150px]" data-testid="select-role-filter">
+            <SelectValue placeholder="All Roles" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="user">User</SelectItem>
+            <SelectItem value="site_admin">Site Admin</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {users && users.length > 0 ? (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Security Groups</TableHead>
-                  <TableHead className="w-24"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="w-8 h-8">
-                          <AvatarFallback className="text-xs">
-                            {user.displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium text-sm" data-testid={`text-user-display-${user.id}`}>{user.displayName}</p>
-                          <p className="text-xs text-muted-foreground">@{user.username}</p>
+        <>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <SortableHead label="User" field="name" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                    <SortableHead label="Email" field="email" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                    <SortableHead label="Role" field="role" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                    <SortableHead label="Status" field="status" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                    <TableHead>Security Groups</TableHead>
+                    <TableHead className="w-24"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedUsers.length > 0 ? paginatedUsers.map((user) => (
+                    <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="w-8 h-8">
+                            <AvatarFallback className="text-xs">
+                              {user.displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-sm" data-testid={`text-user-display-${user.id}`}>{user.displayName}</p>
+                            <p className="text-xs text-muted-foreground">@{user.username}</p>
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{user.email}</TableCell>
-                    <TableCell>
-                      {getRoleBadge(user.role)}
-                    </TableCell>
-                    <TableCell>
-                      {user.approved ? (
-                        <Badge variant="secondary" className="text-[10px]" data-testid={`badge-approved-${user.id}`}>
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Approved
-                        </Badge>
-                      ) : (
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className="text-[10px] border-yellow-500/50 text-yellow-700 dark:text-yellow-400" data-testid={`badge-pending-${user.id}`}>
-                            <Clock className="w-3 h-3 mr-1" />
-                            Pending
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{user.email}</TableCell>
+                      <TableCell>
+                        {getRoleBadge(user.role)}
+                      </TableCell>
+                      <TableCell>
+                        {user.approved ? (
+                          <Badge variant="secondary" className="text-[10px]" data-testid={`badge-approved-${user.id}`}>
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Approved
                           </Badge>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => approveMutation.mutate({ id: user.id, approved: true })}
-                            disabled={approveMutation.isPending}
-                            data-testid={`button-approve-user-${user.id}`}
-                          >
-                            Approve
+                        ) : (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className="text-[10px] border-yellow-500/50 text-yellow-700 dark:text-yellow-400" data-testid={`badge-pending-${user.id}`}>
+                              <Clock className="w-3 h-3 mr-1" />
+                              Pending
+                            </Badge>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => approveMutation.mutate({ id: user.id, approved: true })}
+                              disabled={approveMutation.isPending}
+                              data-testid={`button-approve-user-${user.id}`}
+                            >
+                              Approve
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.securityGroupNames && user.securityGroupNames.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            {user.securityGroupNames.map((name) => (
+                              <Badge key={name} variant="outline" className="text-[10px] whitespace-nowrap w-fit">
+                                <Shield className="w-3 h-3 mr-1 flex-shrink-0" />
+                                {name}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : user.role === "admin" ? (
+                          <span className="text-xs text-muted-foreground italic">All access</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No groups</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => handleEdit(user)} data-testid={`button-edit-user-${user.id}`}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => setDeleteUser(user)} data-testid={`button-delete-user-${user.id}`}>
+                            <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {user.securityGroupNames && user.securityGroupNames.length > 0 ? (
-                        <div className="flex flex-col gap-1">
-                          {user.securityGroupNames.map((name) => (
-                            <Badge key={name} variant="outline" className="text-[10px] whitespace-nowrap w-fit">
-                              <Shield className="w-3 h-3 mr-1 flex-shrink-0" />
-                              {name}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : user.role === "admin" ? (
-                        <span className="text-xs text-muted-foreground italic">All access</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">No groups</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => handleEdit(user)} data-testid={`button-edit-user-${user.id}`}>
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button size="icon" variant="ghost" onClick={() => setDeleteUser(user)} data-testid={`button-delete-user-${user.id}`}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      </TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">
+                        No users match your search
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <div className="flex items-center justify-between mt-4">
+            <p className="text-sm text-muted-foreground" data-testid="text-user-count">
+              {filteredAndSorted.length === (users?.length ?? 0)
+                ? `${filteredAndSorted.length} user${filteredAndSorted.length !== 1 ? "s" : ""}`
+                : `${filteredAndSorted.length} of ${users?.length ?? 0} users`}
+            </p>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={safePage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  data-testid="button-prev-page"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={page === safePage ? "default" : "outline"}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setCurrentPage(page)}
+                    data-testid={`button-page-${page}`}
+                  >
+                    {page}
+                  </Button>
                 ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  data-testid="button-next-page"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </>
       ) : (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
