@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -237,6 +238,7 @@ function ManageRoomsDialog({
   group: GroupWithCounts;
 }) {
   const [search, setSearch] = useState("");
+  const [facilityFilter, setFacilityFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
   const { toast } = useToast();
@@ -268,11 +270,18 @@ function ManageRoomsDialog({
     },
   });
 
-  const filteredRooms = rooms.filter(
-    (r) =>
+  const allFacilities = Array.from(
+    new Map(rooms.map((r) => [r.facilityId, r.facility.name])).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+
+  const filteredRooms = rooms.filter((r) => {
+    const matchesFacility = facilityFilter === "all" || r.facilityId === facilityFilter;
+    const matchesSearch =
+      search === "" ||
       r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.facility.name.toLowerCase().includes(search.toLowerCase())
-  );
+      r.facility.name.toLowerCase().includes(search.toLowerCase());
+    return matchesFacility && matchesSearch;
+  });
 
   const facilitiesMap = new Map<string, { name: string; rooms: RoomWithFacility[] }>();
   filteredRooms.forEach((r) => {
@@ -295,15 +304,28 @@ function ManageRoomsDialog({
           <DialogTitle>Manage Rooms — {group.name}</DialogTitle>
           <DialogDescription>Select which rooms members of this group can book.</DialogDescription>
         </DialogHeader>
-        <div className="relative mb-2">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search rooms..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-            data-testid="input-search-rooms"
-          />
+        <div className="flex gap-2 mb-2">
+          <Select value={facilityFilter} onValueChange={setFacilityFilter}>
+            <SelectTrigger className="w-[180px]" data-testid="select-facility-filter-rooms">
+              <SelectValue placeholder="All Facilities" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Facilities</SelectItem>
+              {allFacilities.map(([id, name]) => (
+                <SelectItem key={id} value={id}>{name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search rooms..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-rooms"
+            />
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto space-y-3 min-h-0 max-h-[40vh] border rounded-md p-2">
           {Array.from(facilitiesMap.entries()).map(([facId, fac]) => (
