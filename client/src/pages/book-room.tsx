@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -121,10 +121,17 @@ export default function BookRoom() {
   const isGuest = !user;
   const isSiteAdmin = user?.role === "site_admin";
 
-  const { data: facilities } = useQuery<Facility[]>({ queryKey: ["/api/facilities"] });
+  const { data: allFacilities } = useQuery<Facility[]>({ queryKey: ["/api/facilities"] });
   const { data: rooms, isLoading } = useQuery<RoomWithFacility[]>({
     queryKey: [user ? "/api/rooms/accessible" : "/api/rooms"],
   });
+  const facilities = useMemo(() => {
+    if (!allFacilities) return [];
+    if (!user) return allFacilities;
+    if (user.role === "admin") return allFacilities;
+    const roomFacilityIds = new Set((rooms ?? []).map((r) => r.facilityId));
+    return allFacilities.filter((f) => roomFacilityIds.has(f.id));
+  }, [allFacilities, rooms, user]);
 
   useEffect(() => {
     if (preselectedRoom && rooms) {

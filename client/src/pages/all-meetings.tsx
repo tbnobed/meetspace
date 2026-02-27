@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -456,7 +456,7 @@ function AllMeetingsSkeleton() {
 export default function AllMeetings() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  const { data: facilities, isLoading: facLoading } = useQuery<Facility[]>({
+  const { data: allFacilities, isLoading: facLoading } = useQuery<Facility[]>({
     queryKey: ["/api/facilities"],
   });
   const { data: allRooms, isLoading: roomsLoading } = useQuery<RoomWithFacility[]>({
@@ -471,6 +471,12 @@ export default function AllMeetings() {
   });
 
   const rooms = isAdmin ? allRooms : (accessibleRooms ?? []);
+  const facilities = useMemo(() => {
+    if (!allFacilities) return [];
+    if (isAdmin || !user) return allFacilities;
+    const accessibleFacilityIds = new Set((accessibleRooms ?? []).map((r) => r.facilityId));
+    return allFacilities.filter((f) => accessibleFacilityIds.has(f.id));
+  }, [allFacilities, accessibleRooms, isAdmin, user]);
   const isLoading = facLoading || roomsLoading || bookingsLoading || (!isAdmin && accessibleLoading);
 
   if (isLoading) return <AllMeetingsSkeleton />;

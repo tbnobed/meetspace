@@ -589,7 +589,7 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [facilityFilter, setFacilityFilter] = useState("all");
 
-  const { data: facilities, isLoading: facLoading } = useQuery<Facility[]>({
+  const { data: allFacilities, isLoading: facLoading } = useQuery<Facility[]>({
     queryKey: ["/api/facilities"],
   });
   const { data: allRooms, isLoading: roomsLoading } = useQuery<RoomWithFacility[]>({
@@ -600,6 +600,12 @@ export default function Dashboard() {
     enabled: !!user,
   });
   const rooms = isAdmin ? allRooms : (accessibleRooms ?? []);
+  const facilities = useMemo(() => {
+    if (!allFacilities) return [];
+    if (isAdmin || !user) return allFacilities;
+    const accessibleFacilityIds = new Set((accessibleRooms ?? []).map((r) => r.facilityId));
+    return allFacilities.filter((f) => accessibleFacilityIds.has(f.id));
+  }, [allFacilities, accessibleRooms, isAdmin, user]);
   const { data: todayBookings, isLoading: todayLoading } = useQuery<BookingWithDetails[]>({
     queryKey: ["/api/bookings/today"],
   });
