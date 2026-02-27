@@ -21,6 +21,7 @@ import {
   Video,
 } from "lucide-react";
 import { formatTime, getBrowserTimezoneAbbr } from "@/lib/constants";
+import { useAuth } from "@/lib/auth";
 import type { Facility, RoomWithFacility, BookingWithDetails } from "@shared/schema";
 
 type ViewMode = "month" | "week" | "day";
@@ -582,6 +583,8 @@ function DashboardSkeleton() {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [facilityFilter, setFacilityFilter] = useState("all");
@@ -589,9 +592,14 @@ export default function Dashboard() {
   const { data: facilities, isLoading: facLoading } = useQuery<Facility[]>({
     queryKey: ["/api/facilities"],
   });
-  const { data: rooms, isLoading: roomsLoading } = useQuery<RoomWithFacility[]>({
+  const { data: allRooms, isLoading: roomsLoading } = useQuery<RoomWithFacility[]>({
     queryKey: ["/api/rooms"],
   });
+  const { data: accessibleRooms, isLoading: accessibleLoading } = useQuery<RoomWithFacility[]>({
+    queryKey: ["/api/rooms/accessible"],
+    enabled: !!user,
+  });
+  const rooms = isAdmin ? allRooms : (accessibleRooms ?? []);
   const { data: todayBookings, isLoading: todayLoading } = useQuery<BookingWithDetails[]>({
     queryKey: ["/api/bookings/today"],
   });
@@ -629,20 +637,28 @@ export default function Dashboard() {
     },
   });
 
-  const isLoading = facLoading || roomsLoading || todayLoading;
+  const isLoading = facLoading || roomsLoading || todayLoading || (!isAdmin && accessibleLoading);
 
   if (isLoading) return <DashboardSkeleton />;
+
+  const accessibleRoomIds = new Set(rooms?.map((r) => r.id) || []);
+  const filteredTodayBookings = isAdmin
+    ? todayBookings
+    : todayBookings?.filter((b) => accessibleRoomIds.has(b.roomId));
+  const filteredBookings = isAdmin
+    ? bookings
+    : bookings?.filter((b) => accessibleRoomIds.has(b.roomId));
 
   const totalRooms = rooms?.length || 0;
   const now = new Date();
   const availableRooms = rooms?.filter((room) => {
-    const hasCurrentBooking = todayBookings?.some(
+    const hasCurrentBooking = filteredTodayBookings?.some(
       (b) => b.roomId === room.id && b.status === "confirmed" && new Date(b.startTime) <= now && new Date(b.endTime) > now
     );
     return !hasCurrentBooking;
   }).length || 0;
 
-  const confirmedToday = todayBookings?.filter((b) => b.status === "confirmed").length || 0;
+  const confirmedToday = filteredTodayBookings?.filter((b) => b.status === "confirmed").length || 0;
 
   function navigatePrev() {
     const d = new Date(currentDate);
@@ -781,21 +797,21 @@ export default function Dashboard() {
       ) : viewMode === "month" ? (
         <MonthView
           currentDate={currentDate}
-          bookings={bookings || []}
+          bookings={filteredBookings || []}
           facilityFilter={facilityFilter}
           onDayClick={handleDayClick}
         />
       ) : viewMode === "week" ? (
         <WeekView
           currentDate={currentDate}
-          bookings={bookings || []}
+          bookings={filteredBookings || []}
           facilityFilter={facilityFilter}
           onDayClick={handleDayClick}
         />
       ) : (
         <DayView
           currentDate={currentDate}
-          bookings={bookings || []}
+          bookings={filteredBookings || []}
           facilityFilter={facilityFilter}
         />
       )}

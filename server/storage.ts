@@ -30,7 +30,7 @@ export interface IStorage {
   updateRoom(id: string, data: Partial<InsertRoom>): Promise<Room | undefined>;
 
   // Users
-  getUsers(): Promise<(User & { facility?: Facility })[]>;
+  getUsers(): Promise<(User & { facility?: Facility; securityGroupNames?: string[] })[]>;
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -150,15 +150,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Users
-  async getUsers(): Promise<(User & { facility?: Facility })[]> {
+  async getUsers(): Promise<(User & { facility?: Facility; securityGroupNames?: string[] })[]> {
     const result = await db
       .select()
       .from(users)
       .leftJoin(facilities, eq(users.facilityId, facilities.id))
       .orderBy(users.displayName);
+
+    const allMemberships = await db
+      .select({
+        userId: securityGroupMembers.userId,
+        groupName: securityGroups.name,
+      })
+      .from(securityGroupMembers)
+      .innerJoin(securityGroups, eq(securityGroupMembers.groupId, securityGroups.id));
+
+    const userGroupMap = new Map<string, string[]>();
+    for (const m of allMemberships) {
+      const existing = userGroupMap.get(m.userId) || [];
+      existing.push(m.groupName);
+      userGroupMap.set(m.userId, existing);
+    }
+
     return result.map((r) => ({
       ...r.users,
       facility: r.facilities || undefined,
+      securityGroupNames: userGroupMap.get(r.users.id) || [],
     }));
   }
 

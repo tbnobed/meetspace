@@ -31,26 +31,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { getTimezoneAbbr } from "@/lib/constants";
-import { Plus, Users, Shield, Building2, Pencil, Trash2, MapPin, CheckCircle, Clock, Mail, Send } from "lucide-react";
-import type { User, Facility } from "@shared/schema";
+import { Plus, Users, Shield, Pencil, Trash2, CheckCircle, Clock, Mail, Send, MapPin } from "lucide-react";
+import type { User } from "@shared/schema";
 
-type UserWithFacility = User & { facility?: Facility };
+type UserWithDetails = User & { securityGroupNames?: string[] };
 
 const userFormSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   displayName: z.string().min(1, "Display name is required"),
   email: z.string().email("Invalid email address"),
   role: z.enum(["admin", "user", "site_admin"]),
-  facilityId: z.string().optional(),
   password: z.string().optional(),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
 
-function UserFormDialog({ user, facilities, open, onOpenChange }: {
-  user?: UserWithFacility;
-  facilities: Facility[];
+function UserFormDialog({ user, open, onOpenChange }: {
+  user?: UserWithDetails;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -64,7 +61,6 @@ function UserFormDialog({ user, facilities, open, onOpenChange }: {
       displayName: user?.displayName || "",
       email: user?.email || "",
       role: (user?.role as "admin" | "user" | "site_admin") || "user",
-      facilityId: user?.facilityId || "",
       password: "",
     },
   });
@@ -75,7 +71,6 @@ function UserFormDialog({ user, facilities, open, onOpenChange }: {
       displayName: user?.displayName || "",
       email: user?.email || "",
       role: (user?.role as "admin" | "user" | "site_admin") || "user",
-      facilityId: user?.facilityId || "",
       password: "",
     });
   }, [user, open]);
@@ -83,9 +78,6 @@ function UserFormDialog({ user, facilities, open, onOpenChange }: {
   const mutation = useMutation({
     mutationFn: async (values: UserFormValues) => {
       const body: Record<string, any> = { ...values };
-      if (!body.facilityId || body.facilityId === "none") {
-        body.facilityId = null;
-      }
       if (isEdit) {
         if (!body.password) {
           delete body.password;
@@ -171,55 +163,29 @@ function UserFormDialog({ user, facilities, open, onOpenChange }: {
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-user-role">
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="user">User</SelectItem>
-                        <SelectItem value="site_admin">Site Admin</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="facilityId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Primary Facility</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-user-facility">
-                          <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {facilities.map((f) => (
-                          <SelectItem key={f.id} value={f.id}>
-                            {f.name} ({getTimezoneAbbr(f.timezone)})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Role</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-user-role">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="user">User</SelectItem>
+                      <SelectItem value="site_admin">Site Admin</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                  <p className="text-xs text-muted-foreground">Room access is managed via Security Groups</p>
+                </FormItem>
+              )}
+            />
             <Button type="submit" className="w-full" disabled={mutation.isPending} data-testid="button-save-user">
               {mutation.isPending ? "Saving..." : isEdit ? "Update User" : "Create User"}
             </Button>
@@ -234,13 +200,11 @@ const inviteFormSchema = z.object({
   email: z.string().email("Valid email is required"),
   displayName: z.string().min(1, "Display name is required"),
   role: z.enum(["admin", "user", "site_admin"]),
-  facilityId: z.string().optional(),
 });
 
 type InviteFormValues = z.infer<typeof inviteFormSchema>;
 
-function InviteUserDialog({ facilities, open, onOpenChange }: {
-  facilities: Facility[];
+function InviteUserDialog({ open, onOpenChange }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -252,7 +216,6 @@ function InviteUserDialog({ facilities, open, onOpenChange }: {
       email: "",
       displayName: "",
       role: "user",
-      facilityId: "",
     },
   });
 
@@ -262,18 +225,13 @@ function InviteUserDialog({ facilities, open, onOpenChange }: {
         email: "",
         displayName: "",
         role: "user",
-        facilityId: "",
       });
     }
   }, [open]);
 
   const mutation = useMutation({
     mutationFn: async (values: InviteFormValues) => {
-      const body: Record<string, any> = { ...values };
-      if (!body.facilityId || body.facilityId === "none") {
-        body.facilityId = null;
-      }
-      return apiRequest("POST", "/api/users/invite", body);
+      return apiRequest("POST", "/api/users/invite", values);
     },
     onSuccess: async (response) => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -329,55 +287,29 @@ function InviteUserDialog({ facilities, open, onOpenChange }: {
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-invite-role">
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="user">User</SelectItem>
-                        <SelectItem value="site_admin">Site Admin</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="facilityId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Primary Facility</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-invite-facility">
-                          <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {facilities.map((f) => (
-                          <SelectItem key={f.id} value={f.id}>
-                            {f.name} ({getTimezoneAbbr(f.timezone)})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Role</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-invite-role">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="user">User</SelectItem>
+                      <SelectItem value="site_admin">Site Admin</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                  <p className="text-xs text-muted-foreground">Room access is managed via Security Groups</p>
+                </FormItem>
+              )}
+            />
             <p className="text-xs text-muted-foreground">A temporary password will be generated and sent to the user along with their login credentials.</p>
             <Button type="submit" className="w-full" disabled={mutation.isPending} data-testid="button-send-invite">
               <Send className="w-4 h-4 mr-2" />
@@ -418,12 +350,11 @@ function getRoleBadge(role: string) {
 export default function AdminUsers() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [editUser, setEditUser] = useState<UserWithFacility | undefined>();
-  const [deleteUser, setDeleteUser] = useState<UserWithFacility | undefined>();
+  const [editUser, setEditUser] = useState<UserWithDetails | undefined>();
+  const [deleteUser, setDeleteUser] = useState<UserWithDetails | undefined>();
   const { toast } = useToast();
 
-  const { data: users, isLoading } = useQuery<UserWithFacility[]>({ queryKey: ["/api/users"] });
-  const { data: facilities } = useQuery<Facility[]>({ queryKey: ["/api/facilities"] });
+  const { data: users, isLoading } = useQuery<UserWithDetails[]>({ queryKey: ["/api/users"] });
 
   const approveMutation = useMutation({
     mutationFn: async ({ id, approved }: { id: string; approved: boolean }) => {
@@ -453,7 +384,7 @@ export default function AdminUsers() {
     },
   });
 
-  const handleEdit = (user: UserWithFacility) => {
+  const handleEdit = (user: UserWithDetails) => {
     setEditUser(user);
     setDialogOpen(true);
   };
@@ -501,7 +432,7 @@ export default function AdminUsers() {
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Facility</TableHead>
+                  <TableHead>Security Groups</TableHead>
                   <TableHead className="w-24"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -550,13 +481,19 @@ export default function AdminUsers() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {user.facility ? (
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <Building2 className="w-3.5 h-3.5" />
-                          {user.facility.name}
+                      {user.securityGroupNames && user.securityGroupNames.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {user.securityGroupNames.map((name) => (
+                            <Badge key={name} variant="outline" className="text-[10px]">
+                              <Shield className="w-3 h-3 mr-1" />
+                              {name}
+                            </Badge>
+                          ))}
                         </div>
+                      ) : user.role === "admin" ? (
+                        <span className="text-xs text-muted-foreground italic">All access</span>
                       ) : (
-                        <span className="text-sm text-muted-foreground">-</span>
+                        <span className="text-xs text-muted-foreground">No groups</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -590,13 +527,11 @@ export default function AdminUsers() {
 
       <UserFormDialog
         user={editUser}
-        facilities={facilities || []}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
       />
 
       <InviteUserDialog
-        facilities={facilities || []}
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}
       />
