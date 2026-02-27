@@ -6,7 +6,7 @@ if ("serviceWorker" in navigator) {
   const isTabletPage = window.location.pathname.startsWith("/tablet") || window.location.pathname.startsWith("/kiosk");
   if (isTabletPage) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker.register("/sw.js", { scope: "/tablet" }).catch(() => {});
       const link = document.createElement("link");
       link.rel = "manifest";
       link.href = "/manifest.json";
@@ -36,6 +36,11 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.getRegistrations().then((registrations) => {
       registrations.forEach((r) => r.unregister());
     });
+    if ("caches" in window) {
+      caches.keys().then((names) => {
+        names.forEach((name) => caches.delete(name));
+      });
+    }
   }
 }
 
