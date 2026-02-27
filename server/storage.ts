@@ -87,6 +87,8 @@ export interface IStorage {
   getSecurityGroupRooms(groupId: string): Promise<SecurityGroupRoom[]>;
   setSecurityGroupRooms(groupId: string, roomIds: string[]): Promise<SecurityGroupRoom[]>;
   getUserAccessibleRoomIds(userId: string): Promise<string[]>;
+  getUserSecurityGroupIds(userId: string): Promise<string[]>;
+  setUserSecurityGroups(userId: string, groupIds: string[]): Promise<void>;
 
   // Audit
   getAuditLogs(): Promise<(AuditLog & { user?: Pick<User, "id" | "displayName" | "email"> })[]>;
@@ -512,6 +514,21 @@ export class DatabaseStorage implements IStorage {
       .from(securityGroupRooms)
       .where(inArray(securityGroupRooms.groupId, groupIds));
     return [...new Set(groupRoomRows.map((r) => r.roomId))];
+  }
+
+  async getUserSecurityGroupIds(userId: string): Promise<string[]> {
+    const rows = await db.select({ groupId: securityGroupMembers.groupId })
+      .from(securityGroupMembers)
+      .where(eq(securityGroupMembers.userId, userId));
+    return rows.map((r) => r.groupId);
+  }
+
+  async setUserSecurityGroups(userId: string, groupIds: string[]): Promise<void> {
+    await db.delete(securityGroupMembers).where(eq(securityGroupMembers.userId, userId));
+    if (groupIds.length > 0) {
+      const values = groupIds.map((groupId) => ({ groupId, userId }));
+      await db.insert(securityGroupMembers).values(values);
+    }
   }
 
   // Audit

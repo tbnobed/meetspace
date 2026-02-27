@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -32,7 +33,8 @@ import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, Users, Shield, Pencil, Trash2, CheckCircle, Clock, Mail, Send, MapPin } from "lucide-react";
-import type { User } from "@shared/schema";
+import { Label } from "@/components/ui/label";
+import type { User, SecurityGroup } from "@shared/schema";
 
 type UserWithDetails = User & { securityGroupNames?: string[] };
 
@@ -53,6 +55,22 @@ function UserFormDialog({ user, open, onOpenChange }: {
 }) {
   const { toast } = useToast();
   const isEdit = !!user;
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+
+  const { data: allGroups = [] } = useQuery<SecurityGroup[]>({
+    queryKey: ["/api/security-groups"],
+    enabled: open,
+  });
+
+  const { data: userGroupIds } = useQuery<string[]>({
+    queryKey: ["/api/users", user?.id, "security-groups"],
+    queryFn: async () => {
+      const res = await fetch(`/api/users/${user!.id}/security-groups`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: open && isEdit && !!user?.id,
+  });
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
@@ -73,11 +91,22 @@ function UserFormDialog({ user, open, onOpenChange }: {
       role: (user?.role as "admin" | "user" | "site_admin") || "user",
       password: "",
     });
-  }, [user, open]);
+    if (userGroupIds) {
+      setSelectedGroupIds(userGroupIds);
+    } else if (!isEdit) {
+      setSelectedGroupIds([]);
+    }
+  }, [user, open, userGroupIds]);
+
+  const toggleGroup = (groupId: string) => {
+    setSelectedGroupIds((prev) =>
+      prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]
+    );
+  };
 
   const mutation = useMutation({
     mutationFn: async (values: UserFormValues) => {
-      const body: Record<string, any> = { ...values };
+      const body: Record<string, any> = { ...values, securityGroupIds: selectedGroupIds };
       if (isEdit) {
         if (!body.password) {
           delete body.password;
@@ -92,6 +121,7 @@ function UserFormDialog({ user, open, onOpenChange }: {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/security-groups"] });
       toast({ title: isEdit ? "User updated" : "User created" });
       onOpenChange(false);
       form.reset();
@@ -182,10 +212,37 @@ function UserFormDialog({ user, open, onOpenChange }: {
                     </SelectContent>
                   </Select>
                   <FormMessage />
-                  <p className="text-xs text-muted-foreground">Room access is managed via Security Groups</p>
                 </FormItem>
               )}
             />
+            <div>
+              <Label className="text-sm font-medium">Security Groups</Label>
+              <p className="text-xs text-muted-foreground mb-2">Assign groups to control which rooms this user can book</p>
+              <div className="border rounded-md max-h-[150px] overflow-y-auto">
+                {allGroups.length > 0 ? allGroups.map((group) => (
+                  <label
+                    key={group.id}
+                    className="flex items-center gap-3 px-3 py-2 hover:bg-accent cursor-pointer border-b last:border-b-0"
+                    data-testid={`group-row-${group.id}`}
+                  >
+                    <Checkbox
+                      checked={selectedGroupIds.includes(group.id)}
+                      onCheckedChange={() => toggleGroup(group.id)}
+                      data-testid={`checkbox-group-${group.id}`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">{group.name}</div>
+                      {group.description && (
+                        <div className="text-xs text-muted-foreground truncate">{group.description}</div>
+                      )}
+                    </div>
+                  </label>
+                )) : (
+                  <p className="text-xs text-muted-foreground text-center py-3">No security groups created yet</p>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{selectedGroupIds.length} group{selectedGroupIds.length !== 1 ? "s" : ""} selected</p>
+            </div>
             <Button type="submit" className="w-full" disabled={mutation.isPending} data-testid="button-save-user">
               {mutation.isPending ? "Saving..." : isEdit ? "Update User" : "Create User"}
             </Button>

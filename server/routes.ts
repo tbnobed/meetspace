@@ -662,6 +662,11 @@ export async function registerRoutes(
     res.json(allUsers);
   });
 
+  app.get("/api/users/:id/security-groups", requireAdmin, async (req, res) => {
+    const groupIds = await storage.getUserSecurityGroupIds(req.params.id);
+    res.json(groupIds);
+  });
+
   app.post("/api/users", requireAdmin, async (req, res) => {
     try {
       const schema = insertUserSchema.pick({
@@ -672,21 +677,26 @@ export async function registerRoutes(
         facilityId: true,
       }).extend({
         password: z.string().min(6, "Password must be at least 6 characters"),
+        securityGroupIds: z.array(z.string()).optional(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ message: parsed.error.errors[0].message });
       }
-      const existing = await storage.getUserByUsername(parsed.data.username);
+      const { securityGroupIds, ...userData } = parsed.data;
+      const existing = await storage.getUserByUsername(userData.username);
       if (existing) {
         return res.status(409).json({ message: "Username already exists" });
       }
-      const hashed = await bcrypt.hash(parsed.data.password, 10);
+      const hashed = await bcrypt.hash(userData.password, 10);
       const user = await storage.createUser({
-        ...parsed.data,
+        ...userData,
         password: hashed,
         approved: true,
       });
+      if (securityGroupIds && securityGroupIds.length > 0) {
+        await storage.setUserSecurityGroups(user.id, securityGroupIds);
+      }
 
       await storage.createAuditLog({
         action: "user_created",
@@ -717,18 +727,23 @@ export async function registerRoutes(
         facilityId: z.string().nullable().optional(),
         password: z.string().min(6).optional(),
         approved: z.boolean().optional(),
+        securityGroupIds: z.array(z.string()).optional(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ message: parsed.error.errors[0].message });
       }
-      const updateData: Record<string, any> = { ...parsed.data };
+      const { securityGroupIds, ...rest } = parsed.data;
+      const updateData: Record<string, any> = { ...rest };
       if (updateData.password) {
         updateData.password = await bcrypt.hash(updateData.password, 10);
       } else {
         delete updateData.password;
       }
       const updated = await storage.updateUser(id, updateData);
+      if (securityGroupIds !== undefined) {
+        await storage.setUserSecurityGroups(id, securityGroupIds);
+      }
       if (!updated) {
         return res.status(404).json({ message: "User not found" });
       }
