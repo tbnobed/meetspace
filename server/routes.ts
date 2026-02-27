@@ -177,48 +177,16 @@ export async function registerRoutes(
       return res.status(401).json({ message: "User not found" });
     }
     const { password: _, ...safeUser } = user;
-
-    if (user.role === "site_admin") {
-      const assignments = await storage.getUserFacilityAssignments(user.id);
-      return res.json({ ...safeUser, assignedFacilityIds: assignments.map((a) => a.facilityId) });
-    }
-
     res.json(safeUser);
   });
 
-  // ── Public Routes (with role-based facility filtering) ──
-  app.get("/api/facilities", async (req, res) => {
-    if (req.session.userId) {
-      const user = await storage.getUser(req.session.userId);
-      if (user && user.role === "site_admin") {
-        const assignments = await storage.getUserFacilityAssignments(user.id);
-        const facilityIds = assignments.map((a) => a.facilityId);
-        const result = await storage.getFacilitiesByIds(facilityIds);
-        return res.json(result);
-      }
-      if (user && user.role === "user" && user.facilityId) {
-        const result = await storage.getFacilitiesByIds([user.facilityId]);
-        return res.json(result);
-      }
-    }
+  // ── Public Routes ──
+  app.get("/api/facilities", async (_req, res) => {
     const result = await storage.getFacilities();
     res.json(result);
   });
 
-  app.get("/api/rooms", async (req, res) => {
-    if (req.session.userId) {
-      const user = await storage.getUser(req.session.userId);
-      if (user && user.role === "site_admin") {
-        const assignments = await storage.getUserFacilityAssignments(user.id);
-        const facilityIds = assignments.map((a) => a.facilityId);
-        const result = await storage.getRoomsByFacilityIds(facilityIds);
-        return res.json(result);
-      }
-      if (user && user.role === "user" && user.facilityId) {
-        const result = await storage.getRoomsByFacilityIds([user.facilityId]);
-        return res.json(result);
-      }
-    }
+  app.get("/api/rooms", async (_req, res) => {
     const result = await storage.getRooms();
     res.json(result);
   });
@@ -257,15 +225,6 @@ export async function registerRoutes(
     } else {
       const currentUser = await storage.getUser(userId);
       if (currentUser && currentUser.role === "site_admin") {
-        const room = await storage.getRoom(req.body.roomId);
-        if (room) {
-          const assignments = await storage.getUserFacilityAssignments(userId);
-          const assignedFacilityIds = assignments.map((a) => a.facilityId);
-          if (assignedFacilityIds.length > 0 && !assignedFacilityIds.includes(room.facilityId)) {
-            return res.status(403).json({ message: "You are not assigned to this facility" });
-          }
-        }
-
         if (req.body.bookedForName && req.body.bookedForEmail) {
           bookedForName = req.body.bookedForName;
           bookedForEmail = req.body.bookedForEmail;
@@ -385,24 +344,7 @@ export async function registerRoutes(
       return res.json(result);
     }
 
-    if (user.role === "admin") {
-      const result = await storage.getBookings();
-      return res.json(result);
-    }
-
-    if (user.role === "site_admin") {
-      const assignments = await storage.getUserFacilityAssignments(user.id);
-      const facilityIds = assignments.map((a) => a.facilityId);
-      const result = await storage.getBookingsByFacilityIds(facilityIds);
-      return res.json(result);
-    }
-
-    if (user.facilityId) {
-      const result = await storage.getBookingsByFacilityIds([user.facilityId]);
-      return res.json(result);
-    }
-
-    const result = await storage.getBookingsByUserId(user.id);
+    const result = await storage.getBookings();
     res.json(result);
   });
 
@@ -417,31 +359,11 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Invalid date format" });
     }
     const result = await storage.getBookingsByRange(startDate, endDate);
-    const user = await storage.getUser(req.session.userId as string);
-    if (user && user.role === "site_admin") {
-      const assignments = await storage.getUserFacilityAssignments(user.id);
-      const facilityIds = assignments.map((a) => a.facilityId);
-      return res.json(result.filter((b) => facilityIds.includes(b.room.facilityId)));
-    }
-    if (user && user.role === "user" && user.facilityId) {
-      return res.json(result.filter((b) => b.room.facilityId === user.facilityId));
-    }
     res.json(result);
   });
 
-  app.get("/api/bookings/today", requireAuth, async (req, res) => {
-    const user = await storage.getUser(req.session.userId as string);
-    if (user && user.role === "site_admin") {
-      const assignments = await storage.getUserFacilityAssignments(user.id);
-      const facilityIds = assignments.map((a) => a.facilityId);
-      const allToday = await storage.getTodayBookings();
-      const filtered = allToday.filter((b) => facilityIds.includes(b.room.facilityId));
-      return res.json(filtered);
-    }
+  app.get("/api/bookings/today", requireAuth, async (_req, res) => {
     const allToday = await storage.getTodayBookings();
-    if (user && user.role === "user" && user.facilityId) {
-      return res.json(allToday.filter((b) => b.room.facilityId === user.facilityId));
-    }
     res.json(allToday);
   });
 
@@ -635,32 +557,6 @@ export async function registerRoutes(
     }
   });
 
-  // ── User Facility Assignments ──
-  app.get("/api/users/:id/facility-assignments", requireAdmin, async (req, res) => {
-    const assignments = await storage.getUserFacilityAssignments(req.params.id as string);
-    res.json(assignments);
-  });
-
-  app.put("/api/users/:id/facility-assignments", requireAdmin, async (req, res) => {
-    const schema = z.object({
-      facilityIds: z.array(z.string()),
-    });
-    const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ message: "facilityIds array is required" });
-    }
-    const assignments = await storage.setUserFacilityAssignments(req.params.id as string, parsed.data.facilityIds);
-    await storage.createAuditLog({
-      userId: req.session.userId as string,
-      action: "user_updated",
-      entityType: "user",
-      entityId: req.params.id as string,
-      details: JSON.stringify({ action: "facility_assignments_updated", facilityIds: parsed.data.facilityIds }),
-    });
-    io.emit("users:updated");
-    res.json(assignments);
-  });
-
   // ── Admin Routes ──
   app.post("/api/facilities", requireAdmin, async (req, res) => {
     const parsed = insertFacilitySchema.safeParse(req.body);
@@ -749,16 +645,7 @@ export async function registerRoutes(
 
   app.get("/api/users", requireAdmin, async (_req, res) => {
     const allUsers = await storage.getUsers();
-    const usersWithAssignments = await Promise.all(
-      allUsers.map(async (user) => {
-        if (user.role === "site_admin") {
-          const assignments = await storage.getUserFacilityAssignments(user.id);
-          return { ...user, assignedFacilityIds: assignments.map((a) => a.facilityId) };
-        }
-        return { ...user, assignedFacilityIds: [] as string[] };
-      })
-    );
-    res.json(usersWithAssignments);
+    res.json(allUsers);
   });
 
   app.post("/api/users", requireAdmin, async (req, res) => {
@@ -771,7 +658,6 @@ export async function registerRoutes(
         facilityId: true,
       }).extend({
         password: z.string().min(6, "Password must be at least 6 characters"),
-        assignedFacilityIds: z.array(z.string()).optional(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
@@ -782,16 +668,11 @@ export async function registerRoutes(
         return res.status(409).json({ message: "Username already exists" });
       }
       const hashed = await bcrypt.hash(parsed.data.password, 10);
-      const { assignedFacilityIds, ...userData } = parsed.data;
       const user = await storage.createUser({
-        ...userData,
+        ...parsed.data,
         password: hashed,
         approved: true,
       });
-
-      if (parsed.data.role === "site_admin" && assignedFacilityIds && assignedFacilityIds.length > 0) {
-        await storage.setUserFacilityAssignments(user.id, assignedFacilityIds);
-      }
 
       await storage.createAuditLog({
         action: "user_created",
@@ -822,14 +703,12 @@ export async function registerRoutes(
         facilityId: z.string().nullable().optional(),
         password: z.string().min(6).optional(),
         approved: z.boolean().optional(),
-        assignedFacilityIds: z.array(z.string()).optional(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ message: parsed.error.errors[0].message });
       }
-      const { assignedFacilityIds, ...updateFields } = parsed.data;
-      const updateData: Record<string, any> = { ...updateFields };
+      const updateData: Record<string, any> = { ...parsed.data };
       if (updateData.password) {
         updateData.password = await bcrypt.hash(updateData.password, 10);
       } else {
@@ -838,13 +717,6 @@ export async function registerRoutes(
       const updated = await storage.updateUser(id, updateData);
       if (!updated) {
         return res.status(404).json({ message: "User not found" });
-      }
-
-      const newRole = parsed.data.role || existing.role;
-      if (newRole === "site_admin" && assignedFacilityIds !== undefined) {
-        await storage.setUserFacilityAssignments(id, assignedFacilityIds);
-      } else if (newRole !== "site_admin") {
-        await storage.setUserFacilityAssignments(id, []);
       }
 
       if (parsed.data.approved === true && !existing.approved) {
@@ -906,7 +778,6 @@ export async function registerRoutes(
         displayName: z.string().min(1, "Display name is required"),
         role: z.enum(["admin", "user", "site_admin"]).default("user"),
         facilityId: z.string().nullable().optional(),
-        assignedFacilityIds: z.array(z.string()).optional(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
@@ -922,18 +793,13 @@ export async function registerRoutes(
       const username = parsed.data.email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "") + "_" + Date.now().toString(36).slice(-4);
       const hashed = await bcrypt.hash(tempPassword, 10);
 
-      const { assignedFacilityIds, ...userData } = parsed.data;
       const user = await storage.createUser({
-        ...userData,
+        ...parsed.data,
         username,
         password: hashed,
-        facilityId: userData.facilityId || null,
+        facilityId: parsed.data.facilityId || null,
         approved: true,
       });
-
-      if (parsed.data.role === "site_admin" && assignedFacilityIds && assignedFacilityIds.length > 0) {
-        await storage.setUserFacilityAssignments(user.id, assignedFacilityIds);
-      }
 
       const emailSent = await sendInviteEmail({
         to: parsed.data.email,

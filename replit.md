@@ -31,7 +31,7 @@ Conference room management system for a multi-facility organization with ~20 con
 ## User Roles
 - **admin**: Full access to all pages including admin management (rooms, facilities, users, audit logs)
 - **user**: Standard access to dashboard, meetings, booking, and personal bookings
-- **site_admin**: Front desk / reception users who can book rooms on behalf of others (executives, VPs, etc.). Can have multiple facilities assigned and can only book rooms at their assigned facilities. Do NOT have access to admin pages.
+- **site_admin**: Front desk / reception users who can book rooms on behalf of others (executives, VPs, etc.). Room access controlled via security groups. Do NOT have access to admin pages.
 
 ## Key Pages
 - `/auth` - Login and registration page
@@ -54,7 +54,6 @@ Conference room management system for a multi-facility organization with ~20 con
 - **Rooms**: ~20 rooms with capacity, floor, equipment info
 - **Bookings**: Time-slot bookings with conflict detection, meeting type (Teams/Zoom/None), optional bookedForName/bookedForEmail for site admin bookings
 - **Users**: Admin, user, and site_admin roles, bcrypt-hashed passwords, `approved` boolean (default false for self-registration, true for admin-created/guest users)
-- **User Facility Assignments**: Junction table mapping site_admin users to their assigned facilities (many-to-many)
 - **Security Groups**: Named groups of users with room access assignments
 - **Security Group Members**: Junction table mapping users to security groups (many-to-many)
 - **Security Group Rooms**: Junction table mapping rooms to security groups (many-to-many). If a room has no groups assigned, it's open to everyone. If a room has at least one group, only members of those groups (+ admins) can book it.
@@ -83,7 +82,7 @@ All routes prefixed with `/api/`:
 - `POST /api/auth/login` - Login with username/password
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/logout` - Logout
-- `GET /api/auth/me` - Get current user (includes assignedFacilityIds for site_admin)
+- `GET /api/auth/me` - Get current user
 - `GET /api/facilities` - List facilities
 - `GET /api/rooms` - List rooms
 - `POST /api/bookings` - Create booking (supports guest with guestName/guestEmail, site_admin with bookedForName/bookedForEmail)
@@ -99,13 +98,11 @@ All routes prefixed with `/api/`:
 ### Admin Only
 - `POST /api/facilities`, `PATCH /api/facilities/:id`
 - `POST /api/rooms`, `PATCH /api/rooms/:id`
-- `GET /api/users` - List users (includes assignedFacilityIds for site_admin users)
-- `POST /api/users` - Create user (supports assignedFacilityIds for site_admin)
+- `GET /api/users` - List users
+- `POST /api/users` - Create user
 - `POST /api/users/invite` - Invite user via email (creates account with temp password, sends invite email)
-- `PATCH /api/users/:id` - Update user (supports assignedFacilityIds)
+- `PATCH /api/users/:id` - Update user
 - `DELETE /api/users/:id` - Delete user
-- `GET /api/users/:id/facility-assignments` - Get user facility assignments
-- `PUT /api/users/:id/facility-assignments` - Set user facility assignments
 - `GET /api/audit-logs`
 - `GET /api/security-groups` - List security groups with member/room counts
 - `GET /api/security-groups/:id` - Get group detail with memberIds and roomIds

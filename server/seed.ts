@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { facilities, rooms, users, bookings, userFacilityAssignments } from "@shared/schema";
+import { facilities, rooms, users, bookings } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
@@ -128,11 +128,6 @@ export async function seedDatabase() {
     facilityId: tustin.id,
     approved: true,
   }).returning();
-
-  await db.insert(userFacilityAssignments).values([
-    { userId: receptionist.id, facilityId: tustin.id },
-    { userId: receptionist.id, facilityId: nashville.id },
-  ]);
 
   const today = new Date();
   const makeTime = (hour: number, min: number = 0) => {

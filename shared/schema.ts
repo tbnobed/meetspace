@@ -42,12 +42,6 @@ export const users = pgTable("users", {
   approved: boolean("approved").notNull().default(false),
 });
 
-export const userFacilityAssignments = pgTable("user_facility_assignments", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  facilityId: varchar("facility_id").notNull().references(() => facilities.id, { onDelete: "cascade" }),
-});
-
 export const bookings = pgTable("bookings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   roomId: varchar("room_id").notNull().references(() => rooms.id),
@@ -130,7 +124,6 @@ export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true 
   meetingLink: z.string().nullable().optional(),
 });
 export const insertRoomTabletSchema = createInsertSchema(roomTablets).omit({ id: true });
-export const insertUserFacilityAssignmentSchema = createInsertSchema(userFacilityAssignments).omit({ id: true });
 export const insertGraphSubscriptionSchema = createInsertSchema(graphSubscriptions).omit({ id: true, createdAt: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, timestamp: true });
 export const insertSecurityGroupSchema = createInsertSchema(securityGroups).omit({ id: true, createdAt: true });
@@ -146,8 +139,6 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Booking = typeof bookings.$inferSelect;
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
-export type UserFacilityAssignment = typeof userFacilityAssignments.$inferSelect;
-export type InsertUserFacilityAssignment = z.infer<typeof insertUserFacilityAssignmentSchema>;
 export type RoomTablet = typeof roomTablets.$inferSelect;
 export type InsertRoomTablet = z.infer<typeof insertRoomTabletSchema>;
 export type GraphSubscription = typeof graphSubscriptions.$inferSelect;

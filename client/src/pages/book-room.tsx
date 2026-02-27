@@ -585,10 +585,7 @@ export default function BookRoom() {
                         <SelectValue placeholder="Select a facility first" />
                       </SelectTrigger>
                       <SelectContent>
-                        {(isSiteAdmin && user?.assignedFacilityIds?.length
-                          ? facilities?.filter((f) => user.assignedFacilityIds!.includes(f.id))
-                          : facilities
-                        )?.map((f) => (
+                        {facilities?.map((f) => (
                           <SelectItem key={f.id} value={f.id}>
                             {f.name} ({getTimezoneAbbr(f.timezone)})
                           </SelectItem>
@@ -604,10 +601,7 @@ export default function BookRoom() {
                         <FormItem>
                           <FormControl>
                             <RoomSelector
-                              rooms={isSiteAdmin && user?.assignedFacilityIds?.length
-                                ? (rooms || []).filter((r) => user.assignedFacilityIds!.includes(r.facilityId))
-                                : (rooms || [])
-                              }
+                              rooms={rooms || []}
                               value={field.value}
                               onChange={field.onChange}
                               facilityId={selectedFacility}

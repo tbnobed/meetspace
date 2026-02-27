@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -36,7 +35,7 @@ import { getTimezoneAbbr } from "@/lib/constants";
 import { Plus, Users, Shield, Building2, Pencil, Trash2, MapPin, CheckCircle, Clock, Mail, Send } from "lucide-react";
 import type { User, Facility } from "@shared/schema";
 
-type UserWithFacility = User & { facility?: Facility; assignedFacilityIds?: string[] };
+type UserWithFacility = User & { facility?: Facility };
 
 const userFormSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
@@ -45,7 +44,6 @@ const userFormSchema = z.object({
   role: z.enum(["admin", "user", "site_admin"]),
   facilityId: z.string().optional(),
   password: z.string().optional(),
-  assignedFacilityIds: z.array(z.string()).optional(),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -68,7 +66,6 @@ function UserFormDialog({ user, facilities, open, onOpenChange }: {
       role: (user?.role as "admin" | "user" | "site_admin") || "user",
       facilityId: user?.facilityId || "",
       password: "",
-      assignedFacilityIds: user?.assignedFacilityIds || [],
     },
   });
 
@@ -80,20 +77,14 @@ function UserFormDialog({ user, facilities, open, onOpenChange }: {
       role: (user?.role as "admin" | "user" | "site_admin") || "user",
       facilityId: user?.facilityId || "",
       password: "",
-      assignedFacilityIds: user?.assignedFacilityIds || [],
     });
   }, [user, open]);
-
-  const watchRole = form.watch("role");
 
   const mutation = useMutation({
     mutationFn: async (values: UserFormValues) => {
       const body: Record<string, any> = { ...values };
       if (!body.facilityId || body.facilityId === "none") {
         body.facilityId = null;
-      }
-      if (body.role !== "site_admin") {
-        delete body.assignedFacilityIds;
       }
       if (isEdit) {
         if (!body.password) {
@@ -229,41 +220,6 @@ function UserFormDialog({ user, facilities, open, onOpenChange }: {
                 )}
               />
             </div>
-            {watchRole === "site_admin" && (
-              <FormField
-                control={form.control}
-                name="assignedFacilityIds"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Assigned Facilities</FormLabel>
-                    <p className="text-xs text-muted-foreground mb-2">Select which facilities this site admin can book rooms at</p>
-                    <div className="space-y-2 border rounded-md p-3">
-                      {facilities.map((f) => {
-                        const checked = (field.value || []).includes(f.id);
-                        return (
-                          <label key={f.id} className="flex items-center gap-2 cursor-pointer" data-testid={`checkbox-facility-${f.id}`}>
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={(val) => {
-                                const current = field.value || [];
-                                if (val) {
-                                  field.onChange([...current, f.id]);
-                                } else {
-                                  field.onChange(current.filter((id: string) => id !== f.id));
-                                }
-                              }}
-                            />
-                            <span className="text-sm">{f.name}</span>
-                            <span className="text-xs text-muted-foreground">({getTimezoneAbbr(f.timezone)})</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
             <Button type="submit" className="w-full" disabled={mutation.isPending} data-testid="button-save-user">
               {mutation.isPending ? "Saving..." : isEdit ? "Update User" : "Create User"}
             </Button>
@@ -279,7 +235,6 @@ const inviteFormSchema = z.object({
   displayName: z.string().min(1, "Display name is required"),
   role: z.enum(["admin", "user", "site_admin"]),
   facilityId: z.string().optional(),
-  assignedFacilityIds: z.array(z.string()).optional(),
 });
 
 type InviteFormValues = z.infer<typeof inviteFormSchema>;
@@ -298,7 +253,6 @@ function InviteUserDialog({ facilities, open, onOpenChange }: {
       displayName: "",
       role: "user",
       facilityId: "",
-      assignedFacilityIds: [],
     },
   });
 
@@ -309,21 +263,15 @@ function InviteUserDialog({ facilities, open, onOpenChange }: {
         displayName: "",
         role: "user",
         facilityId: "",
-        assignedFacilityIds: [],
       });
     }
   }, [open]);
-
-  const watchRole = form.watch("role");
 
   const mutation = useMutation({
     mutationFn: async (values: InviteFormValues) => {
       const body: Record<string, any> = { ...values };
       if (!body.facilityId || body.facilityId === "none") {
         body.facilityId = null;
-      }
-      if (body.role !== "site_admin") {
-        delete body.assignedFacilityIds;
       }
       return apiRequest("POST", "/api/users/invite", body);
     },
@@ -430,41 +378,6 @@ function InviteUserDialog({ facilities, open, onOpenChange }: {
                 )}
               />
             </div>
-            {watchRole === "site_admin" && (
-              <FormField
-                control={form.control}
-                name="assignedFacilityIds"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Assigned Facilities</FormLabel>
-                    <p className="text-xs text-muted-foreground mb-2">Select which facilities this site admin can book rooms at</p>
-                    <div className="space-y-2 border rounded-md p-3">
-                      {facilities.map((f) => {
-                        const checked = (field.value || []).includes(f.id);
-                        return (
-                          <label key={f.id} className="flex items-center gap-2 cursor-pointer" data-testid={`checkbox-invite-facility-${f.id}`}>
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={(val) => {
-                                const current = field.value || [];
-                                if (val) {
-                                  field.onChange([...current, f.id]);
-                                } else {
-                                  field.onChange(current.filter((id: string) => id !== f.id));
-                                }
-                              }}
-                            />
-                            <span className="text-sm">{f.name}</span>
-                            <span className="text-xs text-muted-foreground">({getTimezoneAbbr(f.timezone)})</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
             <p className="text-xs text-muted-foreground">A temporary password will be generated and sent to the user along with their login credentials.</p>
             <Button type="submit" className="w-full" disabled={mutation.isPending} data-testid="button-send-invite">
               <Send className="w-4 h-4 mr-2" />
@@ -611,13 +524,6 @@ export default function AdminUsers() {
                     <TableCell className="text-sm text-muted-foreground">{user.email}</TableCell>
                     <TableCell>
                       {getRoleBadge(user.role)}
-                      {user.role === "site_admin" && user.assignedFacilityIds && user.assignedFacilityIds.length > 0 && (
-                        <div className="mt-1">
-                          <span className="text-[10px] text-muted-foreground">
-                            {user.assignedFacilityIds.length} site{user.assignedFacilityIds.length !== 1 ? "s" : ""}
-                          </span>
-                        </div>
-                      )}
                     </TableCell>
                     <TableCell>
                       {user.approved ? (

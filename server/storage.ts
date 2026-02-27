@@ -1,14 +1,13 @@
 import { eq, and, gte, lte, or, desc, ne, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
-  facilities, rooms, users, bookings, auditLogs, userFacilityAssignments, graphSubscriptions, roomTablets,
+  facilities, rooms, users, bookings, auditLogs, graphSubscriptions, roomTablets,
   securityGroups, securityGroupMembers, securityGroupRooms,
   type Facility, type InsertFacility,
   type Room, type InsertRoom,
   type User, type InsertUser,
   type Booking, type InsertBooking,
   type AuditLog, type InsertAuditLog,
-  type UserFacilityAssignment, type InsertUserFacilityAssignment,
   type RoomTablet, type InsertRoomTablet,
   type GraphSubscription, type InsertGraphSubscription,
   type RoomWithFacility, type BookingWithDetails,
@@ -19,7 +18,6 @@ import {
 export interface IStorage {
   // Facilities
   getFacilities(): Promise<Facility[]>;
-  getFacilitiesByIds(ids: string[]): Promise<Facility[]>;
   getFacility(id: string): Promise<Facility | undefined>;
   createFacility(data: InsertFacility): Promise<Facility>;
   updateFacility(id: string, data: Partial<InsertFacility>): Promise<Facility | undefined>;
@@ -27,7 +25,6 @@ export interface IStorage {
 
   // Rooms
   getRooms(): Promise<RoomWithFacility[]>;
-  getRoomsByFacilityIds(facilityIds: string[]): Promise<RoomWithFacility[]>;
   getRoom(id: string): Promise<RoomWithFacility | undefined>;
   createRoom(data: InsertRoom): Promise<Room>;
   updateRoom(id: string, data: Partial<InsertRoom>): Promise<Room | undefined>;
@@ -43,14 +40,9 @@ export interface IStorage {
   nullifyAuditLogUser(userId: string): Promise<void>;
   getAdminEmails(): Promise<string[]>;
 
-  // User Facility Assignments
-  getUserFacilityAssignments(userId: string): Promise<UserFacilityAssignment[]>;
-  setUserFacilityAssignments(userId: string, facilityIds: string[]): Promise<UserFacilityAssignment[]>;
-
   // Bookings
   getBookings(): Promise<BookingWithDetails[]>;
   getBookingsByUserId(userId: string): Promise<BookingWithDetails[]>;
-  getBookingsByFacilityIds(facilityIds: string[]): Promise<BookingWithDetails[]>;
   getBookingsByRange(start: Date, end: Date): Promise<BookingWithDetails[]>;
   getTodayBookings(): Promise<BookingWithDetails[]>;
   getBooking(id: string): Promise<BookingWithDetails | undefined>;
@@ -108,11 +100,6 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(facilities).orderBy(facilities.name);
   }
 
-  async getFacilitiesByIds(ids: string[]): Promise<Facility[]> {
-    if (ids.length === 0) return [];
-    return db.select().from(facilities).where(inArray(facilities.id, ids)).orderBy(facilities.name);
-  }
-
   async getFacility(id: string): Promise<Facility | undefined> {
     const [result] = await db.select().from(facilities).where(eq(facilities.id, id));
     return result;
@@ -139,17 +126,6 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(rooms)
       .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
-      .orderBy(rooms.name);
-    return result.map((r) => ({ ...r.rooms, facility: r.facilities }));
-  }
-
-  async getRoomsByFacilityIds(facilityIds: string[]): Promise<RoomWithFacility[]> {
-    if (facilityIds.length === 0) return [];
-    const result = await db
-      .select()
-      .from(rooms)
-      .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
-      .where(inArray(rooms.facilityId, facilityIds))
       .orderBy(rooms.name);
     return result.map((r) => ({ ...r.rooms, facility: r.facilities }));
   }
@@ -226,18 +202,6 @@ export class DatabaseStorage implements IStorage {
     return admins.map((a) => a.email);
   }
 
-  // User Facility Assignments
-  async getUserFacilityAssignments(userId: string): Promise<UserFacilityAssignment[]> {
-    return db.select().from(userFacilityAssignments).where(eq(userFacilityAssignments.userId, userId));
-  }
-
-  async setUserFacilityAssignments(userId: string, facilityIds: string[]): Promise<UserFacilityAssignment[]> {
-    await db.delete(userFacilityAssignments).where(eq(userFacilityAssignments.userId, userId));
-    if (facilityIds.length === 0) return [];
-    const values = facilityIds.map((facilityId) => ({ userId, facilityId }));
-    return db.insert(userFacilityAssignments).values(values).returning();
-  }
-
   // Bookings
   private mapBookingRow(r: any): BookingWithDetails {
     return {
@@ -267,19 +231,6 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
       .leftJoin(users, eq(bookings.userId, users.id))
       .where(eq(bookings.userId, userId))
-      .orderBy(desc(bookings.startTime));
-    return result.map((r) => this.mapBookingRow(r));
-  }
-
-  async getBookingsByFacilityIds(facilityIds: string[]): Promise<BookingWithDetails[]> {
-    if (facilityIds.length === 0) return [];
-    const result = await db
-      .select()
-      .from(bookings)
-      .innerJoin(rooms, eq(bookings.roomId, rooms.id))
-      .innerJoin(facilities, eq(rooms.facilityId, facilities.id))
-      .leftJoin(users, eq(bookings.userId, users.id))
-      .where(inArray(rooms.facilityId, facilityIds))
       .orderBy(desc(bookings.startTime));
     return result.map((r) => this.mapBookingRow(r));
   }
