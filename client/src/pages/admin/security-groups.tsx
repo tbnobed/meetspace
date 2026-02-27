@@ -328,6 +328,27 @@ function ManageRoomsDialog({
           </div>
         </div>
         <div className="flex-1 overflow-y-auto space-y-3 min-h-0 max-h-[40vh] border rounded-md p-2">
+          {filteredRooms.length > 0 && (
+            <label className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent cursor-pointer border-b mb-1" data-testid="select-all-rooms">
+              <Checkbox
+                checked={filteredRooms.every((r) => selectedIds.includes(r.id))}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSelectedIds((prev) => {
+                      const newIds = new Set(prev);
+                      filteredRooms.forEach((r) => newIds.add(r.id));
+                      return Array.from(newIds);
+                    });
+                  } else {
+                    const filteredSet = new Set(filteredRooms.map((r) => r.id));
+                    setSelectedIds((prev) => prev.filter((id) => !filteredSet.has(id)));
+                  }
+                }}
+                data-testid="checkbox-select-all-rooms"
+              />
+              <span className="text-sm font-semibold">Select All</span>
+            </label>
+          )}
           {Array.from(facilitiesMap.entries()).map(([facId, fac]) => (
             <div key={facId}>
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 px-2">
