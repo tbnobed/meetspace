@@ -1,4 +1,5 @@
-const CACHE_NAME = "meetspace-kiosk-v2";
+const CACHE_NAME = "meetspace-kiosk-v3";
+const KIOSK_PATHS = ["/tablet", "/kiosk"];
 const PRECACHE_URLS = [
   "/tablet",
   "/kiosk",
@@ -31,6 +32,11 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
+
+  const isKioskPath = KIOSK_PATHS.some((p) => url.pathname.startsWith(p));
+  if (!isKioskPath) {
+    return;
+  }
 
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(
