@@ -482,10 +482,10 @@ export default function AdminUsers() {
                     </TableCell>
                     <TableCell>
                       {user.securityGroupNames && user.securityGroupNames.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-col gap-1">
                           {user.securityGroupNames.map((name) => (
-                            <Badge key={name} variant="outline" className="text-[10px]">
-                              <Shield className="w-3 h-3 mr-1" />
+                            <Badge key={name} variant="outline" className="text-[10px] whitespace-nowrap w-fit">
+                              <Shield className="w-3 h-3 mr-1 flex-shrink-0" />
                               {name}
                             </Badge>
                           ))}
