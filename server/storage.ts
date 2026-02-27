@@ -86,8 +86,7 @@ export interface IStorage {
   setSecurityGroupMembers(groupId: string, userIds: string[]): Promise<SecurityGroupMember[]>;
   getSecurityGroupRooms(groupId: string): Promise<SecurityGroupRoom[]>;
   setSecurityGroupRooms(groupId: string, roomIds: string[]): Promise<SecurityGroupRoom[]>;
-  getUserAccessibleRoomIds(userId: string): Promise<string[] | null>;
-  getRoomsWithNoGroupRestrictions(): Promise<string[]>;
+  getUserAccessibleRoomIds(userId: string): Promise<string[]>;
 
   // Audit
   getAuditLogs(): Promise<(AuditLog & { user?: Pick<User, "id" | "displayName" | "email"> })[]>;
@@ -484,33 +483,18 @@ export class DatabaseStorage implements IStorage {
     return db.insert(securityGroupRooms).values(values).returning();
   }
 
-  async getUserAccessibleRoomIds(userId: string): Promise<string[] | null> {
+  async getUserAccessibleRoomIds(userId: string): Promise<string[]> {
     const memberships = await db.select({ groupId: securityGroupMembers.groupId })
       .from(securityGroupMembers)
       .where(eq(securityGroupMembers.userId, userId));
     if (memberships.length === 0) {
-      const unrestricted = await this.getRoomsWithNoGroupRestrictions();
-      return unrestricted;
+      return [];
     }
     const groupIds = memberships.map((m) => m.groupId);
     const groupRoomRows = await db.select({ roomId: securityGroupRooms.roomId })
       .from(securityGroupRooms)
       .where(inArray(securityGroupRooms.groupId, groupIds));
-    const groupRoomIds = [...new Set(groupRoomRows.map((r) => r.roomId))];
-    const unrestricted = await this.getRoomsWithNoGroupRestrictions();
-    const combined = [...new Set([...groupRoomIds, ...unrestricted])];
-    return combined;
-  }
-
-  async getRoomsWithNoGroupRestrictions(): Promise<string[]> {
-    const restrictedRoomRows = await db.select({ roomId: securityGroupRooms.roomId }).from(securityGroupRooms);
-    const restrictedRoomIds = [...new Set(restrictedRoomRows.map((r) => r.roomId))];
-    if (restrictedRoomIds.length === 0) {
-      const allRooms = await db.select({ id: rooms.id }).from(rooms);
-      return allRooms.map((r) => r.id);
-    }
-    const allRooms = await db.select({ id: rooms.id }).from(rooms);
-    return allRooms.filter((r) => !restrictedRoomIds.includes(r.id)).map((r) => r.id);
+    return [...new Set(groupRoomRows.map((r) => r.roomId))];
   }
 
   // Audit

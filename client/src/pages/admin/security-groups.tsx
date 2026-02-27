@@ -293,7 +293,7 @@ function ManageRoomsDialog({
       <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Manage Rooms — {group.name}</DialogTitle>
-          <DialogDescription>Select which rooms members of this group can book. Rooms with no groups assigned remain open to everyone.</DialogDescription>
+          <DialogDescription>Select which rooms members of this group can book.</DialogDescription>
         </DialogHeader>
         <div className="relative mb-2">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -382,7 +382,7 @@ export default function AdminSecurityGroups() {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Manage room access by creating groups and assigning users and rooms to them.
-            Rooms with no groups assigned are open to everyone.
+            Users must be in a security group to book rooms. Admins bypass all restrictions.
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)} data-testid="button-create-group">

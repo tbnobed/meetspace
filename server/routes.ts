@@ -191,6 +191,20 @@ export async function registerRoutes(
     res.json(result);
   });
 
+  app.get("/api/rooms/accessible", requireAuth, async (req, res) => {
+    const userId = req.session.userId as string;
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(401).json({ message: "User not found" });
+    if (user.role === "admin") {
+      const allRooms = await storage.getRooms();
+      return res.json(allRooms);
+    }
+    const accessibleIds = await storage.getUserAccessibleRoomIds(userId);
+    const allRooms = await storage.getRooms();
+    const filtered = allRooms.filter((r) => accessibleIds.includes(r.id));
+    res.json(filtered);
+  });
+
   app.get("/api/rooms/:id", async (req, res) => {
     const room = await storage.getRoom(req.params.id);
     if (!room) return res.status(404).json({ message: "Room not found" });
@@ -236,7 +250,7 @@ export async function registerRoutes(
       const bookingUser = await storage.getUser(userId);
       if (bookingUser && bookingUser.role !== "admin") {
         const accessibleIds = await storage.getUserAccessibleRoomIds(userId);
-        if (accessibleIds !== null && !accessibleIds.includes(req.body.roomId)) {
+        if (!accessibleIds.includes(req.body.roomId)) {
           return res.status(403).json({ message: "You do not have access to book this room" });
         }
       }
@@ -1085,24 +1099,6 @@ export async function registerRoutes(
     if (!group) return res.status(404).json({ message: "Security group not found" });
     const groupRooms = await storage.setSecurityGroupRooms(req.params.id, roomIds);
     res.json(groupRooms);
-  });
-
-  app.get("/api/rooms/accessible", requireAuth, async (req, res) => {
-    const userId = req.session.userId as string;
-    const user = await storage.getUser(userId);
-    if (!user) return res.status(401).json({ message: "User not found" });
-    if (user.role === "admin") {
-      const allRooms = await storage.getRooms();
-      return res.json(allRooms);
-    }
-    const accessibleIds = await storage.getUserAccessibleRoomIds(userId);
-    if (accessibleIds === null) {
-      const allRooms = await storage.getRooms();
-      return res.json(allRooms);
-    }
-    const allRooms = await storage.getRooms();
-    const filtered = allRooms.filter((r) => accessibleIds.includes(r.id));
-    res.json(filtered);
   });
 
   // ── Graph Webhook Endpoint (public - called by Microsoft) ──

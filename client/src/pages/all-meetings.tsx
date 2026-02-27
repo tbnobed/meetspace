@@ -506,7 +506,7 @@ export default function AllMeetings() {
           <ScrollArea className="w-full">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {rooms?.map((room) => (
-                <RoomAvailabilityCard key={room.id} room={room} bookings={bookings || []} canBook={!accessibleRooms || accessibleRooms.some((ar) => ar.id === room.id)} />
+                <RoomAvailabilityCard key={room.id} room={room} bookings={bookings || []} canBook={accessibleRooms ? accessibleRooms.some((ar) => ar.id === room.id) : false} />
               ))}
             </div>
           </ScrollArea>
@@ -531,7 +531,7 @@ export default function AllMeetings() {
               {rooms
                 ?.filter((r) => r.facilityId === facility.id)
                 .map((room) => (
-                  <RoomAvailabilityCard key={room.id} room={room} bookings={bookings || []} canBook={!accessibleRooms || accessibleRooms.some((ar) => ar.id === room.id)} />
+                  <RoomAvailabilityCard key={room.id} room={room} bookings={bookings || []} canBook={accessibleRooms ? accessibleRooms.some((ar) => ar.id === room.id) : false} />
                 ))}
             </div>
             {rooms?.filter((r) => r.facilityId === facility.id).length === 0 && (

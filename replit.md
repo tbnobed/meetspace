@@ -56,7 +56,7 @@ Conference room management system for a multi-facility organization with ~20 con
 - **Users**: Admin, user, and site_admin roles, bcrypt-hashed passwords, `approved` boolean (default false for self-registration, true for admin-created/guest users)
 - **Security Groups**: Named groups of users with room access assignments
 - **Security Group Members**: Junction table mapping users to security groups (many-to-many)
-- **Security Group Rooms**: Junction table mapping rooms to security groups (many-to-many). If a room has no groups assigned, it's open to everyone. If a room has at least one group, only members of those groups (+ admins) can book it.
+- **Security Group Rooms**: Junction table mapping rooms to security groups (many-to-many). Non-admin users must be in a security group to book any room, and can only book rooms assigned to their groups. Admins bypass all restrictions.
 - **Room Tablets**: Tablet kiosk credentials per room (username, password, displayName, isActive)
 - **Audit Logs**: Track all system changes
 
