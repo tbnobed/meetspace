@@ -205,6 +205,27 @@ export async function registerRoutes(
     res.json(filtered);
   });
 
+  app.get("/api/rooms/availability", async (req, res) => {
+    const { start, end } = req.query;
+    if (!start || !end) {
+      return res.status(400).json({ message: "start and end query parameters are required" });
+    }
+    const startDate = new Date(start as string);
+    const endDate = new Date(end as string);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res.status(400).json({ message: "Invalid date format" });
+    }
+    const allRooms = await storage.getRooms();
+    const busyRoomIds: string[] = [];
+    for (const room of allRooms) {
+      const hasConflict = await storage.checkConflict(room.id, startDate, endDate);
+      if (hasConflict) {
+        busyRoomIds.push(room.id);
+      }
+    }
+    res.json({ busyRoomIds });
+  });
+
   app.get("/api/rooms/:id", async (req, res) => {
     const room = await storage.getRoom(req.params.id);
     if (!room) return res.status(404).json({ message: "Room not found" });

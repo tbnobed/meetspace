@@ -79,6 +79,7 @@ Conference room management system for a multi-facility organization with ~20 con
 All routes prefixed with `/api/`:
 
 ### Public
+- `GET /api/rooms/availability?start=ISO&end=ISO` - Returns `{ busyRoomIds: string[] }` for rooms with conflicts in the time range
 - `POST /api/auth/login` - Login with username/password
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/logout` - Logout

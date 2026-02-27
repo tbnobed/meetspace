@@ -30,6 +30,8 @@ import {
   Video,
   LogIn,
   Link2,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import type { Facility, RoomWithFacility } from "@shared/schema";
 import logoImage from "../assets/images/MeetSpace_full.png";
@@ -63,48 +65,85 @@ const timeSlots = Array.from({ length: 28 }, (_, i) => {
   };
 });
 
-function RoomSelector({ rooms, value, onChange, facilityId }: {
+function RoomSelector({ rooms, value, onChange, facilityId, busyRoomIds, hasTimeSelected }: {
   rooms: RoomWithFacility[];
   value: string;
   onChange: (val: string) => void;
   facilityId?: string;
+  busyRoomIds: Set<string>;
+  hasTimeSelected: boolean;
 }) {
   const filtered = facilityId ? rooms.filter((r) => r.facilityId === facilityId) : rooms;
+  const available = filtered.filter((r) => !busyRoomIds.has(r.id));
+  const busy = filtered.filter((r) => busyRoomIds.has(r.id));
+  const sorted = hasTimeSelected ? [...available, ...busy] : filtered;
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {filtered.map((room) => (
-        <Card
-          key={room.id}
-          className={`cursor-pointer hover-elevate ${value === room.id ? "ring-2 ring-primary" : ""}`}
-          onClick={() => onChange(room.id)}
-          data-testid={`select-room-${room.id}`}
-        >
-          <CardContent className="p-3">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-medium text-sm">{room.name}</p>
-                <p className="text-xs text-muted-foreground">{room.facility.name}</p>
-              </div>
-              <Badge variant="secondary" className="text-[10px]">
-                <Users className="w-3 h-3 mr-1" />
-                {room.capacity}
-              </Badge>
-            </div>
-            {room.equipment && room.equipment.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {room.equipment.map((eq) => (
-                  <Badge key={eq} variant="outline" className="text-[10px]">{eq}</Badge>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-      {filtered.length === 0 && (
-        <div className="col-span-2 text-center py-8 text-muted-foreground text-sm">
-          No rooms available for this facility
+    <div>
+      {hasTimeSelected && filtered.length > 0 && (
+        <div className="flex items-center gap-4 mb-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+            {available.length} available
+          </span>
+          {busy.length > 0 && (
+            <span className="flex items-center gap-1">
+              <XCircle className="w-3.5 h-3.5 text-red-500" />
+              {busy.length} busy
+            </span>
+          )}
         </div>
       )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {sorted.map((room) => {
+          const isBusy = hasTimeSelected && busyRoomIds.has(room.id);
+          return (
+            <Card
+              key={room.id}
+              className={`transition-all ${isBusy
+                ? "opacity-50 cursor-not-allowed border-red-200 dark:border-red-900"
+                : `cursor-pointer hover-elevate ${value === room.id ? "ring-2 ring-primary" : ""}`
+              }`}
+              onClick={() => { if (!isBusy) onChange(room.id); }}
+              data-testid={`select-room-${room.id}`}
+            >
+              <CardContent className="p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm">{room.name}</p>
+                    <p className="text-xs text-muted-foreground">{room.facility.name}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {hasTimeSelected && (
+                      isBusy ? (
+                        <Badge variant="destructive" className="text-[10px]">Busy</Badge>
+                      ) : (
+                        <Badge className="text-[10px] bg-green-600 hover:bg-green-600 text-white">Open</Badge>
+                      )
+                    )}
+                    <Badge variant="secondary" className="text-[10px]">
+                      <Users className="w-3 h-3 mr-1" />
+                      {room.capacity}
+                    </Badge>
+                  </div>
+                </div>
+                {room.equipment && room.equipment.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {room.equipment.map((eq) => (
+                      <Badge key={eq} variant="outline" className="text-[10px]">{eq}</Badge>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+        {filtered.length === 0 && (
+          <div className="col-span-2 text-center py-8 text-muted-foreground text-sm">
+            No rooms available for this facility
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -120,27 +159,6 @@ export default function BookRoom() {
   const { user } = useAuth();
   const isGuest = !user;
   const isSiteAdmin = user?.role === "site_admin";
-
-  const { data: allFacilities } = useQuery<Facility[]>({ queryKey: ["/api/facilities"] });
-  const { data: rooms, isLoading } = useQuery<RoomWithFacility[]>({
-    queryKey: [user ? "/api/rooms/accessible" : "/api/rooms"],
-  });
-  const facilities = useMemo(() => {
-    if (!allFacilities) return [];
-    if (!user) return allFacilities;
-    if (user.role === "admin") return allFacilities;
-    const roomFacilityIds = new Set((rooms ?? []).map((r) => r.facilityId));
-    return allFacilities.filter((f) => roomFacilityIds.has(f.id));
-  }, [allFacilities, rooms, user]);
-
-  useEffect(() => {
-    if (preselectedRoom && rooms) {
-      const room = rooms.find((r) => r.id === preselectedRoom);
-      if (room) {
-        setSelectedFacility(room.facilityId);
-      }
-    }
-  }, [preselectedRoom, rooms]);
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
@@ -160,6 +178,64 @@ export default function BookRoom() {
       bookedForEmail: "",
     },
   });
+
+  const { data: allFacilities } = useQuery<Facility[]>({ queryKey: ["/api/facilities"] });
+  const { data: rooms, isLoading } = useQuery<RoomWithFacility[]>({
+    queryKey: [user ? "/api/rooms/accessible" : "/api/rooms"],
+  });
+
+  const watchDate = form.watch("date");
+  const watchStartTime = form.watch("startTime");
+  const watchEndTime = form.watch("endTime");
+
+  const availabilityParams = useMemo(() => {
+    if (!watchDate || !watchStartTime || !watchEndTime) return null;
+    if (watchStartTime >= watchEndTime) return null;
+    const dateStr = format(watchDate, "yyyy-MM-dd");
+    const start = new Date(`${dateStr}T${watchStartTime}:00`);
+    const end = new Date(`${dateStr}T${watchEndTime}:00`);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+    return { start: start.toISOString(), end: end.toISOString() };
+  }, [watchDate, watchStartTime, watchEndTime]);
+
+  const { data: availabilityData } = useQuery<{ busyRoomIds: string[] }>({
+    queryKey: ["/api/rooms/availability", availabilityParams?.start, availabilityParams?.end],
+    queryFn: async () => {
+      const res = await fetch(`/api/rooms/availability?start=${encodeURIComponent(availabilityParams!.start)}&end=${encodeURIComponent(availabilityParams!.end)}`);
+      if (!res.ok) throw new Error("Failed to check availability");
+      return res.json();
+    },
+    enabled: !!availabilityParams,
+  });
+
+  const busyRoomIds = useMemo(
+    () => new Set(availabilityData?.busyRoomIds ?? []),
+    [availabilityData]
+  );
+  const hasTimeSelected = !!availabilityParams;
+  const facilities = useMemo(() => {
+    if (!allFacilities) return [];
+    if (!user) return allFacilities;
+    if (user.role === "admin") return allFacilities;
+    const roomFacilityIds = new Set((rooms ?? []).map((r) => r.facilityId));
+    return allFacilities.filter((f) => roomFacilityIds.has(f.id));
+  }, [allFacilities, rooms, user]);
+
+  useEffect(() => {
+    if (preselectedRoom && rooms) {
+      const room = rooms.find((r) => r.id === preselectedRoom);
+      if (room) {
+        setSelectedFacility(room.facilityId);
+      }
+    }
+  }, [preselectedRoom, rooms]);
+
+  useEffect(() => {
+    const selectedRoomId = form.getValues("roomId");
+    if (selectedRoomId && busyRoomIds.has(selectedRoomId)) {
+      form.setValue("roomId", "");
+    }
+  }, [busyRoomIds, form]);
 
   const createBooking = useMutation({
     mutationFn: async (values: BookingFormValues) => {
@@ -612,6 +688,8 @@ export default function BookRoom() {
                               value={field.value}
                               onChange={field.onChange}
                               facilityId={selectedFacility}
+                              busyRoomIds={busyRoomIds}
+                              hasTimeSelected={hasTimeSelected}
                             />
                           </FormControl>
                           <FormMessage />
