@@ -840,7 +840,15 @@ export async function registerRoutes(
       }
 
       const tempPassword = crypto.randomBytes(6).toString("base64url");
-      const username = parsed.data.email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "") + "_" + Date.now().toString(36).slice(-4);
+
+      // Generate a clean username from the email prefix — no random suffix
+      const baseUsername = parsed.data.email.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "");
+      let username = baseUsername;
+      let suffix = 2;
+      while (await storage.getUserByUsername(username)) {
+        username = `${baseUsername}${suffix++}`;
+      }
+
       const hashed = await bcrypt.hash(tempPassword, 10);
 
       const user = await storage.createUser({
@@ -851,11 +859,18 @@ export async function registerRoutes(
         approved: true,
       });
 
+      // Build the login URL from the request or environment
+      const appBaseUrl = process.env.WEBHOOK_BASE_URL ||
+        process.env.APP_URL ||
+        `${req.protocol}://${req.get("host")}`;
+      const loginUrl = `${appBaseUrl}/auth`;
+
       const emailSent = await sendInviteEmail({
         to: parsed.data.email,
         displayName: parsed.data.displayName,
         username,
         tempPassword,
+        loginUrl,
       });
 
       await storage.createAuditLog({
