@@ -40,6 +40,7 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").notNull().default("user"),
   facilityId: varchar("facility_id").references(() => facilities.id),
   approved: boolean("approved").notNull().default(false),
+  inviteSentAt: timestamp("invite_sent_at", { withTimezone: true }),
 });
 
 export const bookings = pgTable("bookings", {

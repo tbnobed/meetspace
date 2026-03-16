@@ -99,6 +99,10 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Your account is pending approval. An administrator will review your registration shortly." });
     }
     req.session.userId = user.id;
+    // Clear pending invite status on first login
+    if (user.inviteSentAt) {
+      await storage.updateUser(user.id, { inviteSentAt: null });
+    }
     const { password: _, ...safeUser } = user;
     res.json(safeUser);
   });
@@ -857,6 +861,7 @@ export async function registerRoutes(
         password: hashed,
         facilityId: parsed.data.facilityId || null,
         approved: true,
+        inviteSentAt: new Date(),
       });
 
       // Build the login URL from the request or environment
@@ -886,6 +891,33 @@ export async function registerRoutes(
       res.status(201).json({ ...safeUser, emailSent });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to invite user" });
+    }
+  });
+
+  app.post("/api/users/:id/resend-invite", requireAdmin, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const tempPassword = crypto.randomBytes(6).toString("base64url");
+      const hashed = await bcrypt.hash(tempPassword, 10);
+      await storage.updateUser(user.id, { password: hashed, inviteSentAt: new Date() });
+
+      const appBaseUrl = process.env.WEBHOOK_BASE_URL ||
+        process.env.APP_URL ||
+        `${req.protocol}://${req.get("host")}`;
+
+      const emailSent = await sendInviteEmail({
+        to: user.email,
+        displayName: user.displayName,
+        username: user.username,
+        tempPassword,
+        loginUrl: `${appBaseUrl}/auth`,
+      });
+
+      res.json({ emailSent });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to resend invite" });
     }
   });
 

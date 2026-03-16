@@ -31,7 +31,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Users, Shield, Pencil, Trash2, CheckCircle, Clock, Mail, Send, MapPin, ChevronsUpDown, Check, X, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Users, Shield, Pencil, Trash2, CheckCircle, Clock, Mail, Send, MapPin, ChevronsUpDown, Check, X, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import type { User, SecurityGroup } from "@shared/schema";
 
@@ -506,6 +506,7 @@ export default function AdminUsers() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
 
   const { data: users, isLoading } = useQuery<UserWithDetails[]>({ queryKey: ["/api/users"] });
@@ -538,6 +539,14 @@ export default function AdminUsers() {
       result = result.filter((u) => u.role === roleFilter);
     }
 
+    if (statusFilter === "invite_pending") {
+      result = result.filter((u) => !!u.inviteSentAt);
+    } else if (statusFilter === "pending_approval") {
+      result = result.filter((u) => !u.approved);
+    } else if (statusFilter === "approved") {
+      result = result.filter((u) => u.approved && !u.inviteSentAt);
+    }
+
     result.sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
@@ -566,7 +575,7 @@ export default function AdminUsers() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilter]);
+  }, [searchQuery, roleFilter, statusFilter]);
 
   const approveMutation = useMutation({
     mutationFn: async ({ id, approved }: { id: string; approved: boolean }) => {
@@ -575,6 +584,19 @@ export default function AdminUsers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({ title: "User status updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resendInviteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("POST", `/api/users/${id}/resend-invite`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "Invite resent", description: "A new invitation email has been sent." });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -656,6 +678,17 @@ export default function AdminUsers() {
             <SelectItem value="site_admin">Site Admin</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[170px]" data-testid="select-status-filter">
+            <SelectValue placeholder="All Statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="pending_approval">Pending Approval</SelectItem>
+            <SelectItem value="invite_pending">Invite Pending</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {users && users.length > 0 ? (
@@ -694,7 +727,14 @@ export default function AdminUsers() {
                         {getRoleBadge(user.role)}
                       </TableCell>
                       <TableCell>
-                        {user.approved ? (
+                        {user.inviteSentAt ? (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className="text-[10px] border-blue-500/50 text-blue-700 dark:text-blue-400" data-testid={`badge-invite-pending-${user.id}`}>
+                              <Mail className="w-3 h-3 mr-1" />
+                              Invite Pending
+                            </Badge>
+                          </div>
+                        ) : user.approved ? (
                           <Badge variant="secondary" className="text-[10px]" data-testid={`badge-approved-${user.id}`}>
                             <CheckCircle className="w-3 h-3 mr-1" />
                             Approved
@@ -735,6 +775,18 @@ export default function AdminUsers() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          {user.inviteSentAt && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Resend invite"
+                              onClick={() => resendInviteMutation.mutate(user.id)}
+                              disabled={resendInviteMutation.isPending}
+                              data-testid={`button-resend-invite-${user.id}`}
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
                           <Button size="icon" variant="ghost" onClick={() => handleEdit(user)} data-testid={`button-edit-user-${user.id}`}>
                             <Pencil className="w-3.5 h-3.5" />
                           </Button>

@@ -109,6 +109,11 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
     console.log('  bookings booked_for columns ensured.');
   } catch(e) { console.log('  bookings booked_for:', e.message); }
 
+  try {
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_sent_at TIMESTAMPTZ');
+    console.log('  users.invite_sent_at column ensured.');
+  } catch(e) { console.log('  users.invite_sent_at:', e.message); }
+
   pool.end();
 })();
 " 2>&1 || true
