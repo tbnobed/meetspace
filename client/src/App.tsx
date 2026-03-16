@@ -25,6 +25,7 @@ import AllMeetings from "@/pages/all-meetings";
 import AuthPage from "@/pages/auth";
 import TabletLogin from "@/pages/tablet-login";
 import KioskDisplay from "@/pages/kiosk";
+import AcceptInvite from "@/pages/accept-invite";
 import NotFound from "@/pages/not-found";
 
 function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
@@ -105,6 +106,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/accept-invite" component={AcceptInvite} />
       <Route path="/tablet" component={TabletLogin} />
       <Route path="/kiosk" component={KioskDisplay} />
       <Route path="/book" component={GuestBookPage} />

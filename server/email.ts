@@ -188,32 +188,23 @@ export async function sendInviteEmail(params: {
   to: string;
   displayName: string;
   username: string;
-  tempPassword: string;
-  loginUrl?: string;
+  inviteUrl: string;
 }): Promise<boolean> {
-  const loginLink = params.loginUrl || "";
-  const loginButton = loginLink
-    ? `<a href="${loginLink}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: 500; margin-top: 8px;">Log In Now</a>`
-    : "";
-
   const html = baseTemplate(`
     <h2 style="color: #111827; margin: 0 0 16px;">You're Invited to MeetSpace Manager</h2>
     <p style="color: #374151; margin: 0 0 16px;">Hi ${escapeHtml(params.displayName)}, an administrator has created an account for you on MeetSpace Manager.</p>
-    <p style="color: #374151; margin: 0 0 16px;">You can use the following credentials to log in:</p>
+    <p style="color: #374151; margin: 0 0 16px;">Click the button below to accept your invitation and set your password. This link expires in <strong>7 days</strong>.</p>
+    <a href="${escapeHtml(params.inviteUrl)}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 12px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 15px; margin: 8px 0 20px;">Accept Invitation &amp; Set Password</a>
     <div style="background: #f9fafb; border-radius: 6px; padding: 16px; margin-bottom: 16px;">
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Username</td>
+          <td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Your username</td>
           <td style="padding: 6px 0; color: #111827; font-size: 14px; font-weight: 600;">${escapeHtml(params.username)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Temporary Password</td>
-          <td style="padding: 6px 0; color: #111827; font-size: 14px; font-weight: 600;">${escapeHtml(params.tempPassword)}</td>
         </tr>
       </table>
     </div>
-    <p style="color: #ef4444; font-size: 13px; font-weight: 500;">Please change your password after your first login.</p>
-    ${loginButton}
+    <p style="color: #6b7280; font-size: 12px;">If the button doesn't work, copy and paste this link into your browser:<br/><a href="${escapeHtml(params.inviteUrl)}" style="color: #2563eb; word-break: break-all;">${escapeHtml(params.inviteUrl)}</a></p>
+    <p style="color: #6b7280; font-size: 12px; margin-top: 8px;">If you didn't expect this invitation, you can safely ignore this email.</p>
   `);
 
   return sendEmail(params.to, `You're Invited to ${APP_NAME}`, html);

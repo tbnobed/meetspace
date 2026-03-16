@@ -41,6 +41,8 @@ export const users = pgTable("users", {
   facilityId: varchar("facility_id").references(() => facilities.id),
   approved: boolean("approved").notNull().default(false),
   inviteSentAt: timestamp("invite_sent_at", { withTimezone: true }),
+  inviteToken: text("invite_token"),
+  inviteTokenExpiresAt: timestamp("invite_token_expires_at", { withTimezone: true }),
 });
 
 export const bookings = pgTable("bookings", {

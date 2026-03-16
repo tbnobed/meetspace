@@ -843,8 +843,6 @@ export async function registerRoutes(
         return res.status(409).json({ message: "A user with this email already exists" });
       }
 
-      const tempPassword = crypto.randomBytes(6).toString("base64url");
-
       // Generate a clean username from the email prefix — no random suffix
       const baseUsername = parsed.data.email.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "");
       let username = baseUsername;
@@ -853,29 +851,31 @@ export async function registerRoutes(
         username = `${baseUsername}${suffix++}`;
       }
 
-      const hashed = await bcrypt.hash(tempPassword, 10);
+      // Token-based invite — no temp password needed
+      const inviteToken = crypto.randomBytes(32).toString("hex");
+      const inviteTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      const placeholderHash = await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 10);
 
       const user = await storage.createUser({
         ...parsed.data,
         username,
-        password: hashed,
+        password: placeholderHash,
         facilityId: parsed.data.facilityId || null,
         approved: true,
         inviteSentAt: new Date(),
+        inviteToken,
+        inviteTokenExpiresAt,
       });
 
-      // Build the login URL from the request or environment
       const appBaseUrl = process.env.WEBHOOK_BASE_URL ||
         process.env.APP_URL ||
         `${req.protocol}://${req.get("host")}`;
-      const loginUrl = `${appBaseUrl}/auth`;
 
       const emailSent = await sendInviteEmail({
         to: parsed.data.email,
         displayName: parsed.data.displayName,
         username,
-        tempPassword,
-        loginUrl,
+        inviteUrl: `${appBaseUrl}/accept-invite?token=${inviteToken}`,
       });
 
       await storage.createAuditLog({
@@ -899,9 +899,9 @@ export async function registerRoutes(
       const user = await storage.getUser(req.params.id);
       if (!user) return res.status(404).json({ message: "User not found" });
 
-      const tempPassword = crypto.randomBytes(6).toString("base64url");
-      const hashed = await bcrypt.hash(tempPassword, 10);
-      await storage.updateUser(user.id, { password: hashed, inviteSentAt: new Date() });
+      const inviteToken = crypto.randomBytes(32).toString("hex");
+      const inviteTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await storage.updateUser(user.id, { inviteSentAt: new Date(), inviteToken, inviteTokenExpiresAt });
 
       const appBaseUrl = process.env.WEBHOOK_BASE_URL ||
         process.env.APP_URL ||
@@ -911,14 +911,52 @@ export async function registerRoutes(
         to: user.email,
         displayName: user.displayName,
         username: user.username,
-        tempPassword,
-        loginUrl: `${appBaseUrl}/auth`,
+        inviteUrl: `${appBaseUrl}/accept-invite?token=${inviteToken}`,
       });
 
       res.json({ emailSent });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to resend invite" });
     }
+  });
+
+  // ── Invite Acceptance (public) ──
+  app.get("/api/auth/invite/:token", async (req, res) => {
+    const user = await storage.getUserByInviteToken(req.params.token);
+    if (!user || !user.inviteToken || !user.inviteTokenExpiresAt) {
+      return res.status(404).json({ message: "Invalid or expired invite link" });
+    }
+    if (new Date() > user.inviteTokenExpiresAt) {
+      return res.status(410).json({ message: "This invite link has expired. Please ask an admin to resend your invite." });
+    }
+    res.json({ displayName: user.displayName, username: user.username, email: user.email });
+  });
+
+  app.post("/api/auth/accept-invite", async (req, res) => {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ message: "Token and password are required" });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters" });
+    }
+    const user = await storage.getUserByInviteToken(token);
+    if (!user || !user.inviteToken || !user.inviteTokenExpiresAt) {
+      return res.status(404).json({ message: "Invalid or expired invite link" });
+    }
+    if (new Date() > user.inviteTokenExpiresAt) {
+      return res.status(410).json({ message: "This invite link has expired. Please ask an admin to resend your invite." });
+    }
+    const hashed = await bcrypt.hash(password, 10);
+    await storage.updateUser(user.id, {
+      password: hashed,
+      inviteToken: null,
+      inviteTokenExpiresAt: null,
+      inviteSentAt: null,
+    });
+    req.session.userId = user.id;
+    const { password: _, ...safeUser } = { ...user, password: hashed };
+    res.json(safeUser);
   });
 
   app.get("/api/audit-logs", requireAdmin, async (_req, res) => {

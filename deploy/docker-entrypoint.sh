@@ -114,6 +114,12 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
     console.log('  users.invite_sent_at column ensured.');
   } catch(e) { console.log('  users.invite_sent_at:', e.message); }
 
+  try {
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_token TEXT');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_token_expires_at TIMESTAMPTZ');
+    console.log('  users invite_token columns ensured.');
+  } catch(e) { console.log('  users invite_token:', e.message); }
+
   pool.end();
 })();
 " 2>&1 || true
